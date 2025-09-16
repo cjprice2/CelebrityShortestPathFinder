@@ -1,0 +1,49 @@
+services:
+  backend:
+    profiles: ["dev", "prod"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend/src/main/resources:/app/backend/src/main/resources:ro
+      - graph-cache:/data
+    environment:
+      - JAVA_OPTS=-Xmx12g -Xms4g
+      - TMDB_API_KEY=${TMDB_API_KEY}
+      - GRAPH_RESOURCE_DIR=/app/backend/src/main/resources
+      - GRAPH_CACHE_FILE=/data/graph-cache.bin
+    restart: "no"
+
+  # Production frontend (built image)
+  frontend:
+    profiles: ["prod"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+      
+  # Development frontend (no image build; hot reload)
+  frontend-dev:
+    profiles: ["dev"]
+    image: node:20-alpine
+    working_dir: /app
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8080
+      PORT: 3000
+    volumes:
+      - ./frontend:/app
+    command: sh -c "npm ci && npm run dev"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  graph-cache: {}

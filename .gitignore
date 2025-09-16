@@ -1,0 +1,58 @@
+# Maven target directory
+/target/
+backend/target/
+
+# Next.js build output
+frontend/.next/
+frontend/out/
+
+# IDE settings
+/.idea/
+/*.iml
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Large data files
+*.exe
+*.tsv
+*.json
+*.json.gz
+filtered_*.json
+filtered_*.json.gz
+
+# IMDb data files and resources
+backend/src/main/resources/*.tsv.gz
+backend/src/main/resources/*.csv.gz
+backend/src/main/resources/*.csv
+backend/src/main/resources/*.db
+backend/src/main/resources/*.db-journal
+backend/src/main/resources/*.bin
+
+# Python files in resources
+backend/src/main/resources/*.py
+
+# Custom runtime files
+/custom-runtime/
+node_modules
+
+# environment variables
+.env
+
+# Build artifacts
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp

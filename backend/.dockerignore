@@ -1,0 +1,13 @@
+target
+.git
+.gitignore
+*.log
+**/*.tsv
+**/*.tsv.gz
+**/*.csv
+**/*.csv.gz
+**/*.db
+**/*.db-journal
+filtered_*.json
+!filtered_*.json.gz
+src/test
