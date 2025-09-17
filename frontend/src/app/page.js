@@ -12,8 +12,8 @@ export default function HomePage() {
   const [cache, setCache] = useState(new Map());
   const [loadingMsg, setLoadingMsg] = useState("Finding shortest path");
 
-  const handleSearch = async (actor1, actor2) => {
-    const cacheKey = [actor1, actor2].sort().join('|');
+  const handleSearch = async (celebrity1, celebrity2) => {
+    const cacheKey = [celebrity1, celebrity2].sort().join('|');
     
     // Check cache first
     if (cache.has(cacheKey)) {
@@ -29,12 +29,18 @@ export default function HomePage() {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 60000); // fail after 60s
-      const res = await fetch(`/api/shortest-path?id1=${encodeURIComponent(actor1)}&id2=${encodeURIComponent(actor2)}&max=5`, { signal: controller.signal });
+      const res = await fetch(`/api/shortest-path?id1=${encodeURIComponent(celebrity1)}&id2=${encodeURIComponent(celebrity2)}&max=5`, { signal: controller.signal });
       clearTimeout(timeout);
 
       if (!res.ok) {
-        // Immediately surface server error
-        throw new Error(`Backend error: ${res.status} ${res.statusText}`);
+        // Handle different error cases with user-friendly messages
+        if (res.status === 500) {
+          throw new Error("No paths found, try a different pair of celebrities");
+        } else if (res.status === 404) {
+          throw new Error("One or both celebrities not found, try different names");
+        } else {
+          throw new Error("Unable to find connection, try a different pair of celebrities");
+        }
       }
 
       const data = await res.json();
@@ -48,9 +54,9 @@ export default function HomePage() {
       }
     } catch (e) {
       if (e.name === 'AbortError') {
-        setError("Backend took too long to respond. There might be no connection between these actors. Try a different pair of names.");
+        setError("Search timed out. No connection found between these celebrities. Try a different pair of names.");
       } else {
-        setError(e.message || "Failed to connect to backend API.");
+        setError(e.message || "Unable to find connection, try a different pair of celebrities.");
       }
     } finally {
       setLoading(false);

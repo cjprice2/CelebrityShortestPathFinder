@@ -9,10 +9,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
 
 @SpringBootApplication(exclude = {DataSourceAutoConfiguration.class, HibernateJpaAutoConfiguration.class})
-public class ActorShortestPathAppApplication {
+public class CelebrityShortestPathFinderApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(ActorShortestPathAppApplication.class, args);
+        SpringApplication.run(CelebrityShortestPathFinderApplication.class, args);
     }
 
     @Configuration

@@ -15,7 +15,7 @@ export default function Footer() {
           
           {/* Required Disclaimer */}
           <p className="text-xs text-gray-500 text-center">
-            This application uses TMDB and the TMDB API for actor images but is not endorsed, 
+            This application uses TMDB and the TMDB API for celebrity images but is not endorsed, 
             certified, or otherwise approved by TMDB. Celebrity dataset was filtered and cleaned from{" "}
             <a 
               href="https://developer.imdb.com/non-commercial-datasets/" 
@@ -38,6 +38,24 @@ export default function Footer() {
                 className="text-blue-400 hover:text-blue-300 underline"
               >
                 6 degrees of Kevin Bacon
+              </a>
+              .{" "}
+              <a 
+                target="_blank" 
+                href="https://icons8.com/icon/113702/social-network"
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300 underline"
+              >
+                Social Network Favicon
+              </a>{" "}
+              by{" "}
+              <a 
+                target="_blank" 
+                href="https://icons8.com"
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300 underline"
+              >
+                Icons8
               </a>
             </p>
           </div>

@@ -11,10 +11,10 @@ public class Graph implements Serializable {
     private static final long serialVersionUID = 1L;
 
     // Graph structures
-    private Map<String, List<String>> adjacencyList = new HashMap<>(); // actor ID -> neighbor actor IDs
-    private Map<String, String> actorNames = new HashMap<>(); // actor ID -> name
-    private Map<String, String> movieTitles = new HashMap<>(); // movie ID -> title
-    private Map<String, Set<String>> actorMovies = new HashMap<>(); // actor ID -> set of movie IDs
+    private Map<String, List<String>> adjacencyList = new HashMap<>(); // celebrity ID -> neighbor celebrity IDs
+    private Map<String, String> celebrityNames = new HashMap<>(); // celebrity ID -> name
+    private Map<String, String> titleNames = new HashMap<>(); // title ID -> title name
+    private Map<String, Set<String>> celebrityTitles = new HashMap<>(); // celebrity ID -> set of title IDs
 
     // Build status
     private volatile boolean building = false;
@@ -43,12 +43,12 @@ public class Graph implements Serializable {
         if (canUseCache) {
             try (ObjectInputStream in = new ObjectInputStream(new BufferedInputStream(Files.newInputStream(Paths.get(cacheFile))))) {
                 adjacencyList = (Map<String, List<String>>) in.readObject();
-                actorNames = (Map<String, String>) in.readObject();
-                movieTitles = (Map<String, String>) in.readObject();
-                actorMovies = (Map<String, Set<String>>) in.readObject();
+                celebrityNames = (Map<String, String>) in.readObject();
+                titleNames = (Map<String, String>) in.readObject();
+                celebrityTitles = (Map<String, Set<String>>) in.readObject();
                 System.out.println("Loaded graph from cache");
-                System.out.println("Movies: " + movieTitles.size() + 
-                        ", Actors: " + actorNames.size() + 
+                System.out.println("Titles: " + titleNames.size() + 
+                        ", Celebrities: " + celebrityNames.size() + 
                         ", edges: " + (adjacencyList.values().stream().mapToInt(List::size).sum() / 2));
                 return;
             } catch (ClassNotFoundException e) {
@@ -70,10 +70,10 @@ public class Graph implements Serializable {
         System.out.println("Building graph from cast data...");
         building = true;
         statusMessage = "Loading cast data";
-        int movieCount = loadCastData(castFile);
+        int titleCount = loadCastData(castFile);
         trimAdjacencyLists();
-        System.out.println("Finished building graph. Movies: " + movieCount + 
-                ", Actors: " + actorNames.size() + 
+        System.out.println("Finished building graph. Titles: " + titleCount + 
+                ", Celebrities: " + celebrityNames.size() + 
                 ", edges: " + (adjacencyList.values().stream().mapToInt(List::size).sum() / 2));
         statusMessage = "Done";
         building = false;
@@ -81,7 +81,7 @@ public class Graph implements Serializable {
 
     private int loadCastData(String castFile) throws IOException {
         Map<String, Set<String>> neighborSets = new HashMap<>();
-        Map<String, Set<String>> movieActors = new HashMap<>();
+        Map<String, Set<String>> titleCelebrities = new HashMap<>();
         
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(new GZIPInputStream(Files.newInputStream(Paths.get(castFile))), StandardCharsets.UTF_8))) {
             reader.readLine(); // header
@@ -91,49 +91,49 @@ public class Graph implements Serializable {
                 List<String> parts = parseCSVLine(line);
                 if (parts.size() < 4) continue;
                 
-                String movieId = parts.get(0);
-                String movieTitle = parts.get(1);
-                String actorIdsStr = parts.get(2);
-                String actorNamesStr = parts.get(3);
+                String titleId = parts.get(0);
+                String titleName = parts.get(1);
+                String celebrityIdsStr = parts.get(2);
+                String celebrityNamesStr = parts.get(3);
                 
-                List<String> actorIds = actorIdsStr.isEmpty() ? List.of() : Arrays.asList(actorIdsStr.split(","));
-                List<String> names = actorNamesStr.isEmpty() ? List.of() : Arrays.asList(actorNamesStr.split(","));
+                List<String> celebrityIds = celebrityIdsStr.isEmpty() ? List.of() : Arrays.asList(celebrityIdsStr.split(","));
+                List<String> names = celebrityNamesStr.isEmpty() ? List.of() : Arrays.asList(celebrityNamesStr.split(","));
                 
-                movieTitles.put(movieId, movieTitle);
+                titleNames.put(titleId, titleName);
                 
-                if (actorIds.size() >= 2) {
-                    for (int i = 0; i < actorIds.size(); i++) {
-                        String actorId = actorIds.get(i);
-                        String actorName = names.get(i);
+                if (celebrityIds.size() >= 2) {
+                    for (int i = 0; i < celebrityIds.size(); i++) {
+                        String celebrityId = celebrityIds.get(i);
+                        String celebrityName = names.get(i);
                         
-                        actorNames.put(actorId, actorName);
-                        movieActors.computeIfAbsent(movieId, k -> new HashSet<>()).add(actorId);
-                        actorMovies.computeIfAbsent(actorId, k -> new HashSet<>()).add(movieId);
+                        celebrityNames.put(celebrityId, celebrityName);
+                        titleCelebrities.computeIfAbsent(titleId, k -> new HashSet<>()).add(celebrityId);
+                        celebrityTitles.computeIfAbsent(celebrityId, k -> new HashSet<>()).add(titleId);
                     }
                 }
                 
-                if ((++count % 50000) == 0) System.out.println("Processed movies: " + count);
+                if ((++count % 50000) == 0) System.out.println("Processed titles: " + count);
             }
         }
         
-        System.out.println("Building edges from " + movieActors.size() + " movies...");
+        System.out.println("Building edges from " + titleCelebrities.size() + " titles...");
         long edgeCount = 0;
-        int movieCount = 0;
-        for (Set<String> actors : movieActors.values()) {
-            String[] actorArray = actors.toArray(new String[0]);
+        int titleCount = 0;
+        for (Set<String> celebrities : titleCelebrities.values()) {
+            String[] celebrityArray = celebrities.toArray(new String[0]);
             
-            for (int i = 0; i < actorArray.length; i++) {
-                for (int j = i + 1; j < actorArray.length; j++) {
-                    String a = actorArray[i];
-                    String b = actorArray[j];
+            for (int i = 0; i < celebrityArray.length; i++) {
+                for (int j = i + 1; j < celebrityArray.length; j++) {
+                    String a = celebrityArray[i];
+                    String b = celebrityArray[j];
                     neighborSets.computeIfAbsent(a, k -> new HashSet<>()).add(b);
                     neighborSets.computeIfAbsent(b, k -> new HashSet<>()).add(a);
                     edgeCount++;
                 }
             }
             
-            if (++movieCount % 50000 == 0) {
-                System.out.println("Processed " + movieCount + " movies, built " + edgeCount + " edges...");
+            if (++titleCount % 50000 == 0) {
+                System.out.println("Processed " + titleCount + " titles, built " + edgeCount + " edges...");
             }
         }
         
@@ -141,7 +141,7 @@ public class Graph implements Serializable {
             adjacencyList.put(e.getKey(), new ArrayList<>(e.getValue()));
         }
         
-        return movieActors.size();
+        return titleCelebrities.size();
     }
 
     private void saveCache(String cacheFile) {
@@ -157,9 +157,9 @@ public class Graph implements Serializable {
             }
             try (ObjectOutputStream out = new ObjectOutputStream(new BufferedOutputStream(Files.newOutputStream(cachePath)))) {
                 out.writeObject(adjacencyList);
-                out.writeObject(actorNames);
-                out.writeObject(movieTitles);
-                out.writeObject(actorMovies);
+                out.writeObject(celebrityNames);
+                out.writeObject(titleNames);
+                out.writeObject(celebrityTitles);
                 System.out.println("Saved graph cache");
             }
         } catch (IOException e) {
@@ -175,69 +175,82 @@ public class Graph implements Serializable {
         }
     }
 
-    // --- NEW: BIDIRECTIONAL BFS IMPLEMENTATION ---
     public String findShortestPath(String startId, String endId) {
-        if (startId == null || endId == null || startId.isBlank() || endId.isBlank()) return "Invalid IDs.";
-        if (!adjacencyList.containsKey(startId) || !adjacencyList.containsKey(endId)) return "One or both IDs do not exist.";
-        if (startId.equals(endId)) return formatActor(startId);
+        List<String> paths = findAllShortestPaths(startId, endId, 1);
+        return paths.isEmpty() ? "No path found." : paths.get(0);
+    }
 
-        // Data structures for the forward search (from startId)
-        Deque<String> queueForward = new ArrayDeque<>();
-        Map<String, String> parentForward = new HashMap<>();
+    public List<String> findAllShortestPaths(String startId, String endId, int maxPaths) {
+        if (startId == null || endId == null || startId.isBlank() || endId.isBlank()) return List.of("Invalid IDs.");
+        if (!adjacencyList.containsKey(startId) || !adjacencyList.containsKey(endId)) return List.of("One or both IDs do not exist.");
+        if (startId.equals(endId)) return List.of(formatCelebrity(startId));
+
+        // Use bidirectional BFS to find all shortest paths
+        Map<String, List<String>> parentForward = new HashMap<>();
+        Map<String, List<String>> parentBackward = new HashMap<>();
         Set<String> visitedForward = new HashSet<>();
-
-        // Data structures for the backward search (from endId)
-        Deque<String> queueBackward = new ArrayDeque<>();
-        Map<String, String> parentBackward = new HashMap<>();
         Set<String> visitedBackward = new HashSet<>();
+        Deque<String> queueForward = new ArrayDeque<>();
+        Deque<String> queueBackward = new ArrayDeque<>();
 
         queueForward.add(startId);
         visitedForward.add(startId);
-        parentForward.put(startId, null);
+        parentForward.put(startId, new ArrayList<>());
 
         queueBackward.add(endId);
         visitedBackward.add(endId);
-        parentBackward.put(endId, null);
+        parentBackward.put(endId, new ArrayList<>());
+
+        List<String> meetingNodes = new ArrayList<>();
+        int shortestDistance = -1;
+        int level = 0;
 
         while (!queueForward.isEmpty() && !queueBackward.isEmpty()) {
-            // Always expand the smaller frontier first for efficiency
-            boolean forwardFirst = queueForward.size() <= queueBackward.size();
-            String meetingNode;
+            level++;
+            
+            // Expand forward direction
+            List<String> forwardMeeting = expandLevelBidirectional(queueForward, visitedForward, visitedBackward, parentForward);
+            if (!forwardMeeting.isEmpty() && shortestDistance == -1) {
+                shortestDistance = level;
+                meetingNodes.addAll(forwardMeeting);
+            }
+            
+            // Expand backward direction
+            List<String> backwardMeeting = expandLevelBidirectional(queueBackward, visitedBackward, visitedForward, parentBackward);
+            if (!backwardMeeting.isEmpty() && shortestDistance == -1) {
+                shortestDistance = level;
+                meetingNodes.addAll(backwardMeeting);
+            }
 
-            if (forwardFirst) {
-                meetingNode = expandLevel(queueForward, visitedForward, visitedBackward, parentForward);
-                if (meetingNode != null) {
-                    return reconstructBidirectionalPath(parentForward, parentBackward, startId, endId, meetingNode);
-                }
-
-                meetingNode = expandLevel(queueBackward, visitedBackward, visitedForward, parentBackward);
-                if (meetingNode != null) {
-                    return reconstructBidirectionalPath(parentForward, parentBackward, startId, endId, meetingNode);
-                }
-            } else {
-                meetingNode = expandLevel(queueBackward, visitedBackward, visitedForward, parentBackward);
-                if (meetingNode != null) {
-                    return reconstructBidirectionalPath(parentForward, parentBackward, startId, endId, meetingNode);
-                }
-
-                meetingNode = expandLevel(queueForward, visitedForward, visitedBackward, parentForward);
-                if (meetingNode != null) {
-                    return reconstructBidirectionalPath(parentForward, parentBackward, startId, endId, meetingNode);
-                }
+            // If we found meeting nodes, stop
+            if (shortestDistance != -1) {
+                break;
             }
         }
 
-        return "No path found.";
+        if (meetingNodes.isEmpty()) return List.of("No path found.");
+
+        // Generate all paths from meeting nodes
+        List<String> allPaths = new ArrayList<>();
+        for (String meetingNode : meetingNodes) {
+            if (allPaths.size() >= maxPaths) break;
+            String path = reconstructBidirectionalPathMultiple(parentForward, parentBackward, startId, endId, meetingNode);
+            allPaths.add(path);
+        }
+
+        return allPaths;
     }
 
-    private String expandLevel(Deque<String> queue, Set<String> visited, Set<String> otherVisited, Map<String, String> parent) {
+    private List<String> expandLevelBidirectional(Deque<String> queue, Set<String> visited, Set<String> otherVisited, Map<String, List<String>> parent) {
+        List<String> meetingNodes = new ArrayList<>();
         int levelSize = queue.size();
+        
         for (int i = 0; i < levelSize; i++) {
             String current = queue.poll();
 
             // Check for intersection
             if (otherVisited.contains(current)) {
-                return current; // Found the meeting point
+                meetingNodes.add(current);
             }
 
             List<String> neighbors = adjacencyList.get(current);
@@ -245,173 +258,106 @@ public class Graph implements Serializable {
 
             for (String neighbor : neighbors) {
                 if (visited.add(neighbor)) { // True if the neighbor was not already visited
-                    parent.put(neighbor, current);
+                    parent.computeIfAbsent(neighbor, k -> new ArrayList<>()).add(current);
                     queue.add(neighbor);
+                } else if (parent.containsKey(neighbor)) {
+                    // If already visited, check if this is another way to reach it at the same level
+                    parent.get(neighbor).add(current);
                 }
             }
         }
-        return null; // No meeting point found at this level
+        return meetingNodes;
     }
 
-    private String reconstructBidirectionalPath(Map<String, String> parentForward, Map<String, String> parentBackward, String startId, String endId, String meetingNode) {
-        Deque<String> deque = new ArrayDeque<>();
+    private String reconstructBidirectionalPathMultiple(Map<String, List<String>> parentForward, Map<String, List<String>> parentBackward, String startId, String endId, String meetingNode) {
+        List<String> path = new ArrayList<>();
 
-        // Build start -> meeting by prepending while walking parents from the meeting to start
+        // Build start -> meeting by walking parents from the meeting to start
         String current = meetingNode;
-        while (current != null) {
-            deque.addFirst(current);
-            current = parentForward.get(current);
+        while (current != null && !current.equals(startId)) {
+            path.add(0, current); // Add to beginning
+            List<String> parents = parentForward.get(current);
+            current = (parents != null && !parents.isEmpty()) ? parents.get(0) : null;
         }
+        if (current != null) path.add(0, current); // Add start node
 
         // Then append meeting -> end by following backward parents from the node after meeting
-        current = parentBackward.get(meetingNode);
-        while (current != null) {
-            deque.addLast(current);
-            current = parentBackward.get(current);
+        current = meetingNode;
+        List<String> backwardParents = parentBackward.get(current);
+        if (backwardParents != null && !backwardParents.isEmpty()) {
+            current = backwardParents.get(0);
+            while (current != null && !current.equals(endId)) {
+                path.add(current);
+                List<String> parents = parentBackward.get(current);
+                current = (parents != null && !parents.isEmpty()) ? parents.get(0) : null;
+            }
+            if (current != null) path.add(current); // Add end node
         }
 
-        List<String> path = new ArrayList<>(deque);
         return formatPathFromNodeList(path, startId, endId);
     }
-    // --- END OF BIDIRECTIONAL BFS IMPLEMENTATION ---
 
-
-    public List<String> findAllShortestPaths(String startId, String endId, int maxPaths) {
-        if (startId == null || endId == null || startId.isBlank() || endId.isBlank()) return List.of("Invalid IDs.");
-        if (!adjacencyList.containsKey(startId) || !adjacencyList.containsKey(endId)) return List.of("One or both IDs do not exist.");
-        if (startId.equals(endId)) return List.of(formatActor(startId));
-
-        // First BFS to compute distances and predecessor lists
-        Map<String, Integer> distance = new HashMap<>();
-        Map<String, List<String>> predecessors = new HashMap<>();
-        Deque<String> queue = new ArrayDeque<>();
-
-        distance.put(startId, 0);
-        queue.add(startId);
-
-        int foundDistance = -1;
-        while (!queue.isEmpty()) {
-            String current = queue.poll();
-            int currDist = distance.get(current);
-            if (foundDistance != -1 && currDist + 1 > foundDistance) break;
-
-            List<String> neighbors = adjacencyList.get(current);
-            if (neighbors == null) continue;
-            for (String neighbor : neighbors) {
-                int nextDist = currDist + 1;
-                if (!distance.containsKey(neighbor)) {
-                    distance.put(neighbor, nextDist);
-                    predecessors.computeIfAbsent(neighbor, k -> new ArrayList<>()).add(current);
-                    queue.add(neighbor);
-                } else if (distance.get(neighbor) == nextDist) {
-                    predecessors.computeIfAbsent(neighbor, k -> new ArrayList<>()).add(current);
-                }
-                if (neighbor.equals(endId)) {
-                    foundDistance = nextDist;
-                }
-            }
-        }
-
-        if (foundDistance == -1) return List.of("No path found.");
-
-        // Enumerate paths using DFS on predecessor graph
-        List<List<String>> rawPaths = new ArrayList<>();
-        Deque<String> currentPath = new ArrayDeque<>();
-        currentPath.push(endId);
-
-        findPathsDfs(startId, endId, predecessors, currentPath, rawPaths, maxPaths);
-
-        List<String> formatted = new ArrayList<>();
-        for (List<String> path : rawPaths) {
-            formatted.add(formatPathFromNodeList(path, startId, endId));
-        }
-        return formatted.isEmpty() ? List.of("No path found.") : formatted;
-    }
-
-    private void findPathsDfs(String startId, String currentNode, Map<String, List<String>> predecessors, Deque<String> currentPath, List<List<String>> allPaths, int maxPaths) {
-        if (allPaths.size() >= maxPaths) return;
-
-        if (currentNode.equals(startId)) {
-            List<String> path = new ArrayList<>(currentPath);
-            Collections.reverse(path);
-            allPaths.add(path);
-            return;
-        }
-
-        List<String> preds = predecessors.getOrDefault(currentNode, List.of());
-        for (String pred : preds) {
-            currentPath.push(pred);
-            findPathsDfs(startId, pred, predecessors, currentPath, allPaths, maxPaths);
-            currentPath.pop();
-            if (allPaths.size() >= maxPaths) return;
-        }
-    }
 
     private String formatPathFromNodeList(List<String> path, String startId, String endId) {
         StringBuilder sb = new StringBuilder();
+        
+        // Extract celebrity IDs and title IDs
+        List<String> celebrityIds = new ArrayList<>();
+        List<String> titleIds = new ArrayList<>();
+        List<String> titleNames = new ArrayList<>();
+        
+        for (int i = 0; i < path.size(); i++) {
+            String nodeId = path.get(i);
+            celebrityIds.add(nodeId);
+            
+            if (i < path.size() - 1) {
+                String nextNodeId = path.get(i + 1);
+                String commonTitleId = findCommonTitleIdBetweenCelebrities(nodeId, nextNodeId);
+                String commonTitleName = findCommonTitleNameBetweenCelebrities(nodeId, nextNodeId);
+                titleIds.add(commonTitleId != null ? commonTitleId : "unknown");
+                titleNames.add(commonTitleName != null ? commonTitleName : "Unknown Title");
+            }
+        }
+        
+        // Format the path for display (this should be the first non-metadata line)
+        for (int i = 0; i < path.size(); i++) {
+            if (i > 0) sb.append(" -> ");
+            sb.append(formatCelebrity(path.get(i)));
+        }
+        sb.append("\n");
+        
         // Explicit endpoints for frontend normalization
         sb.append("START_ID:").append(startId).append("\n");
         sb.append("END_ID:").append(endId).append("\n");
-        // First line: actor names joined with arrows (frontend displays these)
-        for (int i = 0; i < path.size(); i++) {
-            if (i > 0) sb.append(" -> ");
-            sb.append(formatActor(path.get(i)));
-        }
-        sb.append("\n");
-
-        // Collect movie IDs and titles for each hop
-        List<String> movieIds = new ArrayList<>();
-        List<String> movieTitlesOut = new ArrayList<>();
-        for (int i = 0; i < path.size() - 1; i++) {
-            String a = path.get(i);
-            String b = path.get(i + 1);
-            movieIds.add(findCommonMovieIdBetweenActors(a, b));
-            movieTitlesOut.add(findCommonTitleBetweenActors(a, b));
-        }
-
-        // Actor IDs line
-        sb.append("ACTOR_IDS:");
-        for (String actorId : path) {
-            sb.append(actorId).append(",");
-        }
-        sb.append("\n");
-
-        // Movie IDs line
-        sb.append("MOVIE_IDS:");
-        for (String movieId : movieIds) {
-            sb.append(movieId).append(",");
-        }
-        sb.append("\n");
-
-        // Movie titles line for frontend (no sentence parsing)
-        sb.append("MOVIE_TITLES:");
-        for (String title : movieTitlesOut) {
-            sb.append(title).append(",");
-        }
-
+        
+        // API format uses legacy naming for backward compatibility
+        sb.append("ACTOR_IDS:").append(String.join(",", celebrityIds)).append("\n");
+        sb.append("MOVIE_IDS:").append(String.join(",", titleIds)).append("\n");
+        sb.append("MOVIE_TITLES:").append(String.join(",", titleNames)).append("\n");
+        
         return sb.toString();
     }
-
-    private String findCommonTitleBetweenActors(String a, String b) {
-        Set<String> ta = actorMovies.getOrDefault(a, Set.of());
-        Set<String> tb = actorMovies.getOrDefault(b, Set.of());
-        for (String t : ta) if (tb.contains(t)) return movieTitles.getOrDefault(t, t);
+    
+    private String findCommonTitleNameBetweenCelebrities(String a, String b) {
+        Set<String> ta = celebrityTitles.getOrDefault(a, Set.of());
+        Set<String> tb = celebrityTitles.getOrDefault(b, Set.of());
+        for (String t : ta) if (tb.contains(t)) return titleNames.getOrDefault(t, "Unknown Title");
         return "Unknown Title";
     }
     
-    private String findCommonMovieIdBetweenActors(String a, String b) {
-        Set<String> ta = actorMovies.getOrDefault(a, Set.of());
-        Set<String> tb = actorMovies.getOrDefault(b, Set.of());
+    private String findCommonTitleIdBetweenCelebrities(String a, String b) {
+        Set<String> ta = celebrityTitles.getOrDefault(a, Set.of());
+        Set<String> tb = celebrityTitles.getOrDefault(b, Set.of());
         for (String t : ta) if (tb.contains(t)) return t;
         return "unknown";
     }
 
-    private String formatActor(String actorId) {
-        return actorNames.getOrDefault(actorId, "Unknown");
+    private String formatCelebrity(String celebrityId) {
+        return celebrityNames.getOrDefault(celebrityId, "Unknown");
     }
 
     public Map<String, String> getActorNames() {
-        return new HashMap<>(actorNames);
+        return new HashMap<>(celebrityNames);
     }
     
     private List<String> parseCSVLine(String line) {

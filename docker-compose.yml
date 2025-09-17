@@ -29,16 +29,19 @@ services:
     depends_on:
       - backend
       
-  # Development frontend (no image build; hot reload)
+  # Development frontend (built image with hot reload)
   frontend-dev:
     profiles: ["dev"]
-    image: node:20-alpine
-    working_dir: /app
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: deps
     environment:
       NEXT_PUBLIC_API_URL: http://backend:8080
       PORT: 3000
     volumes:
       - ./frontend:/app
+      - /app/node_modules
     command: sh -c "npm ci && npm run dev"
     ports:
       - "3000:3000"

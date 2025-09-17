@@ -10,7 +10,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.example</groupId>
-    <artifactId>ActorShortestPathApp</artifactId>
+    <artifactId>CelebrityShortestPathFinder</artifactId>
     <version>1.0-SNAPSHOT</version>
 
     <properties>
@@ -74,7 +74,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.example.ActorShortestPathAppApplication</mainClass>
+                            <mainClass>com.example.CelebrityShortestPathFinderApplication</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

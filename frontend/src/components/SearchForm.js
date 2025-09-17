@@ -16,15 +16,12 @@ export default function SearchForm({ onSearch }) {
   const abortController1 = useRef(null);
   const abortController2 = useRef(null);
 
-  // Optional: could fetch photos by ID for UI embellishments later
-  const fetchActorPhotoById = async () => null;
-
-  // Search actors in the graph for suggestions
-  const searchActors = async (q, setSuggestions, abortController) => {
+  // Search celebrities in the graph for suggestions
+  const searchCelebrities = async (q, setSuggestions, abortController) => {
     if (!q || q.trim().length === 0) { setSuggestions([]); return; }
     try {
       // Use graph-based search for exact nconst matches
-      const res = await fetch(`/api/search-actors-graph?q=${encodeURIComponent(q)}`, {
+      const res = await fetch(`/api/search-celebrities-graph?q=${encodeURIComponent(q)}`, {
         signal: abortController.signal
       });
       const items = await res.json();
@@ -38,7 +35,7 @@ export default function SearchForm({ onSearch }) {
         if (!item.nconst) return; // Skip if no ID
         
         try {
-          const photoRes = await fetch(`/api/actor-photo?actorId=${encodeURIComponent(item.nconst)}&actorName=${encodeURIComponent(item.name)}`, {
+          const photoRes = await fetch(`/api/celebrity-photo?celebrityId=${encodeURIComponent(item.nconst)}&celebrityName=${encodeURIComponent(item.name)}`, {
             signal: abortController.signal
           });
           const photoData = await photoRes.json();
@@ -62,7 +59,7 @@ export default function SearchForm({ onSearch }) {
     
     if (value.length > 0) {
       abortController1.current = new AbortController();
-      searchTimeout1.current = setTimeout(() => searchActors(value, setSuggestions1, abortController1.current), 300);
+      searchTimeout1.current = setTimeout(() => searchCelebrities(value, setSuggestions1, abortController1.current), 50);
       setShowSuggestions1(true);
     } else {
       setSuggestions1([]);
@@ -78,7 +75,7 @@ export default function SearchForm({ onSearch }) {
     
     if (value.length > 0) {
       abortController2.current = new AbortController();
-      searchTimeout2.current = setTimeout(() => searchActors(value, setSuggestions2, abortController2.current), 300);
+      searchTimeout2.current = setTimeout(() => searchCelebrities(value, setSuggestions2, abortController2.current), 50);
       setShowSuggestions2(true);
     } else {
       setSuggestions2([]);
@@ -114,7 +111,7 @@ export default function SearchForm({ onSearch }) {
         // If no ID selected, try to find by name in graph
         if (!id1 && name1.trim()) {
           try {
-            const r = await fetch(`/api/search-actors-graph?q=${encodeURIComponent(name1.trim())}`);
+            const r = await fetch(`/api/search-celebrities-graph?q=${encodeURIComponent(name1.trim())}`);
             const d = await r.json();
             if (Array.isArray(d) && d.length > 0) {
               id1 = d[0].nconst;
@@ -123,7 +120,7 @@ export default function SearchForm({ onSearch }) {
         }
         if (!id2 && name2.trim()) {
           try {
-            const r = await fetch(`/api/search-actors-graph?q=${encodeURIComponent(name2.trim())}`);
+            const r = await fetch(`/api/search-celebrities-graph?q=${encodeURIComponent(name2.trim())}`);
             const d = await r.json();
             if (Array.isArray(d) && d.length > 0) {
               id2 = d[0].nconst;

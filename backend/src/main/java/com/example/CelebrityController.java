@@ -10,7 +10,7 @@ import java.util.ArrayList;
 @RestController
 @RequestMapping("/api")
 @CrossOrigin(origins = "*")
-public class ActorController {
+public class CelebrityController {
 
     private final Graph graph;
     private final RestTemplate restTemplate;
@@ -18,7 +18,7 @@ public class ActorController {
     private final Map<String, String> photoCache = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Set<String> failedPhotoLookups = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-    public ActorController(Graph graph, RestTemplate restTemplate) {
+    public CelebrityController(Graph graph, RestTemplate restTemplate) {
         this.graph = graph;
         this.restTemplate = restTemplate;
         this.tmdbApiKey = System.getenv("TMDB_API_KEY");
@@ -37,34 +37,36 @@ public class ActorController {
             @RequestParam String id2,
             @RequestParam(name = "max", required = false, defaultValue = "5") int max) {
         if (id1 == null || id1.isBlank() || id2 == null || id2.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Please provide both actor IDs"));
+            return ResponseEntity.badRequest().body(Map.of("error", "Please provide both celebrity IDs"));
         }
+        // Use findAllShortestPaths to get multiple paths
         List<String> results = graph.findAllShortestPaths(id1, id2, Math.max(1, Math.min(5, max)));
-        if (results.size() == 1 && ("No path found.".equals(results.get(0)) || results.get(0).startsWith("One or both"))) {
+        if (results.size() == 1 && ("No path found.".equals(results.get(0)) || results.get(0).startsWith("One or both") || results.get(0).startsWith("Invalid"))) {
             return ResponseEntity.ok(Map.of("error", results.get(0)));
         }
+        
         return ResponseEntity.ok(Map.of("results", results));
     }
 
 
-    // Search actors in the graph by name
-    @GetMapping("/search-actors-graph")
-    public ResponseEntity<List<Map<String, Object>>> searchActorsGraph(@RequestParam("q") String q) {
+    // Search celebrities in the graph by name
+    @GetMapping("/search-celebrities-graph")
+    public ResponseEntity<List<Map<String, Object>>> searchCelebritiesGraph(@RequestParam("q") String q) {
         if (q == null || q.isBlank()) return ResponseEntity.ok(List.of());
         
         List<Map<String, Object>> results = new ArrayList<>();
         String query = q.toLowerCase().trim();
         
-        // Search through all actors in the graph
+        // Search through all celebrities in the graph
         for (Map.Entry<String, String> entry : graph.getActorNames().entrySet()) {
-            String actorId = entry.getKey();
+            String celebrityId = entry.getKey();
             String name = entry.getValue();
             
             if (name.toLowerCase().contains(query)) {
-                Map<String, Object> actor = new java.util.HashMap<>();
-                actor.put("nconst", actorId);
-                actor.put("name", name);
-                results.add(actor);
+                Map<String, Object> celebrity = new java.util.HashMap<>();
+                celebrity.put("nconst", celebrityId);
+                celebrity.put("name", name);
+                results.add(celebrity);
                 
                 if (results.size() >= 20) break;
             }
@@ -73,23 +75,22 @@ public class ActorController {
         return ResponseEntity.ok(results);
     }
 
-    // Get actor photo from TMDB
-    @GetMapping("/actor-photo")
-    public ResponseEntity<Map<String, Object>> getActorPhoto(
-            @RequestParam(required = false) String actorName,
-            @RequestParam(required = false) String actorId) {
+    // Get celebrity photo from TMDB
+    @GetMapping("/celebrity-photo")
+    public ResponseEntity<Map<String, Object>> getCelebrityPhoto(
+            @RequestParam(required = false) String celebrityId) {
         if (tmdbApiKey == null || tmdbApiKey.isEmpty()) {
             return ResponseEntity.ok(new java.util.HashMap<String, Object>() {{ put("photoUrl", null); }});
         }
 
-        // Only proceed if we have an actorId - no name fallback
-        if (actorId == null || actorId.trim().isEmpty()) {
+        // Only proceed if we have a celebrityId - no name fallback
+        if (celebrityId == null || celebrityId.trim().isEmpty()) {
             return ResponseEntity.ok(new java.util.HashMap<String, Object>() {{ put("photoUrl", null); }});
         }
 
-        String trimmedId = actorId.trim();
+        String trimmedId = celebrityId.trim();
         
-        // Check if we've already tried and failed for this actor
+        // Check if we've already tried and failed for this celebrity
         if (failedPhotoLookups.contains(trimmedId)) {
             return ResponseEntity.ok(new java.util.HashMap<String, Object>() {{ put("photoUrl", null); }});
         }
@@ -112,7 +113,7 @@ public class ActorController {
             }
             
         } catch (Exception e) {
-            System.err.println("Error fetching actor photo for ID " + trimmedId + ": " + e.getMessage());
+            System.err.println("Error fetching celebrity photo for ID " + trimmedId + ": " + e.getMessage());
         }
         
         // Mark as failed lookup to avoid repeated API calls

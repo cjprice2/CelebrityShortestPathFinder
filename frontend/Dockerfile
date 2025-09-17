@@ -1,13 +1,17 @@
 # syntax=docker/dockerfile:1.6
 
+# Base stage with updated npm (cached layer)
+FROM node:22.19.0-alpine AS base
+RUN npm install -g npm@11.6.0
+
 # Dependencies stage
-FROM node:20-alpine AS deps
+FROM base AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
 
 # Build stage
-FROM node:20-alpine AS build
+FROM base AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -16,7 +20,7 @@ ENV NEXT_PUBLIC_API_URL=http://backend:8080
 RUN --mount=type=cache,target=/app/.next/cache npm run build
 
 # Runtime stage
-FROM node:20-alpine AS runtime
+FROM base AS runtime
 ENV NODE_ENV=production
 # Keep for client code that reads it
 ENV NEXT_PUBLIC_API_URL=http://backend:8080
