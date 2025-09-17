@@ -23,5 +23,9 @@ COPY --from=build /app/target/*.jar /app/app.jar
 COPY --from=build /app/src/main/resources/process_imdb_data.py /app/
 COPY --from=build /app/src/main/resources/convert_to_cytoscape.py /app/
 
+# Copy cache download script
+COPY download-cache.sh /app/
+RUN chmod +x /app/download-cache.sh
+
 EXPOSE 8080
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
+ENTRYPOINT ["sh", "-c", "/app/download-cache.sh && java $JAVA_OPTS -jar /app/app.jar"]
