@@ -58,10 +58,13 @@ public class Graph implements Serializable {
             }
         }
         
+        // If cache is missing or invalid, try to build from original data
         if (!Files.isRegularFile(Paths.get(castFile))) {
-            throw new IOException("Cast file not found: " + castFile);
+            System.out.println("Cast file not found: " + castFile + " - cache-only mode");
+            return; // Skip building from cast data if file doesn't exist
         }
         
+        System.out.println("Cache missing or invalid, building from original data...");
         buildFromCastData(castFile);
         saveCache(cacheFile);
     }
