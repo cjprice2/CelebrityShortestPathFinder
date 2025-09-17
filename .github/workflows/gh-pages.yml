@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_PAGES: 'true'
-      NEXT_PUBLIC_API_URL: 'https://cspf-backend-<...>.fly.dev'
+      NEXT_PUBLIC_API_URL: 'https://cspf-backend-colin.fly.dev'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
