@@ -25,6 +25,11 @@ public class CelebrityController {
         this.tmdbApiKey = System.getenv("TMDB_API_KEY");
     }
 
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, String>> health() {
+        return ResponseEntity.ok(Map.of("status", "UP", "service", "celebrity-shortest-path-finder"));
+    }
+
     @GetMapping("/graph-status")
     public ResponseEntity<Map<String, Object>> graphStatus() {
         boolean building = graph.isBuilding();
@@ -40,6 +45,12 @@ public class CelebrityController {
         if (id1 == null || id1.isBlank() || id2 == null || id2.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Please provide both celebrity IDs"));
         }
+        
+        // Check if graph is still loading
+        if (graph.isBuilding()) {
+            return ResponseEntity.status(503).body(Map.of("error", "Graph is still loading. Please try again in a few moments.", "status", graph.getStatusMessage()));
+        }
+        
         // Use findAllShortestPaths to get multiple paths
         List<String> results = graph.findAllShortestPaths(id1, id2, Math.max(1, Math.min(5, max)));
         if (results.size() == 1 && ("No path found.".equals(results.get(0)) || results.get(0).startsWith("One or both") || results.get(0).startsWith("Invalid"))) {
@@ -54,6 +65,11 @@ public class CelebrityController {
     @GetMapping("/search-celebrities-graph")
     public ResponseEntity<List<Map<String, Object>>> searchCelebritiesGraph(@RequestParam(value = "q", required = false) String q) {
         if (q == null || q.isBlank()) return ResponseEntity.ok(List.of());
+        
+        // Check if graph is still loading
+        if (graph.isBuilding()) {
+            return ResponseEntity.status(503).body(List.of(Map.of("error", "Graph is still loading. Please try again in a few moments.", "status", graph.getStatusMessage())));
+        }
         
         List<Map<String, Object>> results = new ArrayList<>();
         String query = q.toLowerCase().trim();

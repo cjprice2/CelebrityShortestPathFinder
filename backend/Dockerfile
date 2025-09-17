@@ -29,4 +29,4 @@ RUN chmod +x /app/download-cache.sh
 
 EXPOSE 8080
 ENV SERVER_ADDRESS=0.0.0.0
-ENTRYPOINT ["sh", "-c", "/app/download-cache.sh && java $JAVA_OPTS -Dserver.address=0.0.0.0 -jar /app/app.jar"]
+ENTRYPOINT ["java", "$JAVA_OPTS", "-Dserver.address=0.0.0.0", "-jar", "/app/app.jar"]

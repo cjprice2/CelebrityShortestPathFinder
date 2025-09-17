@@ -22,9 +22,61 @@ public class Graph implements Serializable {
 
     public boolean isBuilding() { return building; }
     public String getStatusMessage() { return statusMessage; }
+    
+    public void startAsyncLoad() {
+        if (building || !adjacencyList.isEmpty()) {
+            return; // Already building or loaded
+        }
+        
+        new Thread(() -> {
+            try {
+                // First try to download cache if it doesn't exist
+                downloadCacheIfNeeded();
+                loadOrBuild();
+            } catch (IOException e) {
+                System.err.println("Failed to load graph asynchronously: " + e.getMessage());
+                building = false;
+                statusMessage = "Failed to load: " + e.getMessage();
+            }
+        }).start();
+    }
+    
+    private void downloadCacheIfNeeded() {
+        String cacheFile = System.getenv().getOrDefault("GRAPH_CACHE_FILE", "/tmp/graph-cache.bin");
+        if (!Files.exists(Paths.get(cacheFile))) {
+            System.out.println("Cache file not found, downloading...");
+            try {
+                ProcessBuilder pb = new ProcessBuilder("wget", "-c", "-O", cacheFile, 
+                    "https://github.com/cjprice2/CelebrityShortestPathFinder/releases/download/v1.1.0/graph-cache.bin",
+                    "--timeout=30", "--tries=3");
+                Process process = pb.start();
+                int exitCode = process.waitFor();
+                if (exitCode == 0) {
+                    System.out.println("Cache downloaded successfully");
+                } else {
+                    System.out.println("Failed to download cache, will build from scratch");
+                }
+            } catch (Exception e) {
+                System.err.println("Error downloading cache: " + e.getMessage());
+            }
+        }
+    }
 
     public Graph() throws IOException {
         loadOrBuild();
+    }
+    
+    public Graph(boolean empty) {
+        // Empty constructor for when we want to load asynchronously
+        if (!empty) {
+            try {
+                loadOrBuild();
+            } catch (IOException e) {
+                System.err.println("Failed to load graph: " + e.getMessage());
+                building = false;
+                statusMessage = "Failed to load: " + e.getMessage();
+            }
+        }
     }
 
     @SuppressWarnings("unchecked")

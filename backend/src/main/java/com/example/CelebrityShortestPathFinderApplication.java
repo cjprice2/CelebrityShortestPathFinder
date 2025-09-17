@@ -7,9 +7,13 @@ import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfigurat
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 
 @SpringBootApplication(exclude = {DataSourceAutoConfiguration.class, HibernateJpaAutoConfiguration.class})
 public class CelebrityShortestPathFinderApplication {
+
+    private static Graph graphInstance;
 
     public static void main(String[] args) {
         // Force server to bind to 0.0.0.0 instead of localhost
@@ -20,14 +24,24 @@ public class CelebrityShortestPathFinderApplication {
         
         SpringApplication.run(CelebrityShortestPathFinderApplication.class, args);
     }
+    
+    @EventListener(ApplicationReadyEvent.class)
+    public void onApplicationReady() {
+        // Start loading the graph asynchronously after the application is ready
+        if (graphInstance != null) {
+            System.out.println("Starting async graph loading...");
+            graphInstance.startAsyncLoad();
+        }
+    }
 
     @Configuration
     public static class AppConfig {
 
         @Bean
-        public Graph graph() throws java.io.IOException {
-            // Build or load cached graph at startup
-            return new Graph();
+        public Graph graph() {
+            // Create empty graph and start async loading
+            graphInstance = new Graph(true); // true = empty constructor
+            return graphInstance;
         }
         
         @Bean

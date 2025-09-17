@@ -6,7 +6,8 @@ CACHE_URL="https://github.com/cjprice2/CelebrityShortestPathFinder/releases/down
 
 if [ ! -f "$CACHE_FILE" ]; then
     echo "Downloading graph cache..."
-    curl -L -o "$CACHE_FILE" "$CACHE_URL"
+    # Use wget with resume capability and faster options
+    wget -c -O "$CACHE_FILE" "$CACHE_URL" --timeout=30 --tries=3
     if [ $? -eq 0 ]; then
         echo "Cache downloaded successfully"
     else
