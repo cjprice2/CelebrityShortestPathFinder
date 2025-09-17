@@ -12,6 +12,8 @@ import org.springframework.web.client.RestTemplate;
 public class CelebrityShortestPathFinderApplication {
 
     public static void main(String[] args) {
+        // Force server to bind to 0.0.0.0 instead of localhost
+        System.setProperty("server.address", "0.0.0.0");
         SpringApplication.run(CelebrityShortestPathFinderApplication.class, args);
     }
 
