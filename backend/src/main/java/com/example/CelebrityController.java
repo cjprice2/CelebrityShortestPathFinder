@@ -3,6 +3,7 @@ package com.example;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
@@ -33,8 +34,8 @@ public class CelebrityController {
 
     @GetMapping("/shortest-path")
     public ResponseEntity<Map<String, Object>> findShortestPath(
-            @RequestParam String id1,
-            @RequestParam String id2,
+            @RequestParam(required = false) String id1,
+            @RequestParam(required = false) String id2,
             @RequestParam(name = "max", required = false, defaultValue = "5") int max) {
         if (id1 == null || id1.isBlank() || id2 == null || id2.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Please provide both celebrity IDs"));
@@ -51,7 +52,7 @@ public class CelebrityController {
 
     // Search celebrities in the graph by name
     @GetMapping("/search-celebrities-graph")
-    public ResponseEntity<List<Map<String, Object>>> searchCelebritiesGraph(@RequestParam("q") String q) {
+    public ResponseEntity<List<Map<String, Object>>> searchCelebritiesGraph(@RequestParam(value = "q", required = false) String q) {
         if (q == null || q.isBlank()) return ResponseEntity.ok(List.of());
         
         List<Map<String, Object>> results = new ArrayList<>();
@@ -166,5 +167,17 @@ public class CelebrityController {
         return null;
     }
     
+    // Exception handler for parameter binding errors
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String error = "Invalid parameter type for '" + ex.getName() + "': " + ex.getMessage();
+        return ResponseEntity.badRequest().body(Map.of("error", error));
+    }
+    
+    // Exception handler for missing required parameters
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+    }
 
 }
