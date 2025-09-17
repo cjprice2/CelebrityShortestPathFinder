@@ -73,7 +73,7 @@ export default function PathResult({ result }) {
     });
     
     return () => abortController.abort();
-  }, [parsed?.celebrities?.join(','), parsed?.celebrityIds?.join(','), fetchCelebrityPhoto]);
+  }, [parsed, fetchCelebrityPhoto]);
 
   if (!parsed) return <div className="text-gray-400">No path found.</div>;
 
