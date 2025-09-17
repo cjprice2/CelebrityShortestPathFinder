@@ -3,10 +3,10 @@ app = "cspf-frontend"
 primary_region = "iad"
 
 [build]
-  args = { NEXT_PUBLIC_API_URL = "https://cspf-backend.fly.dev" }
+  args = { NEXT_PUBLIC_API_URL = "https://cspf-backend-colin.fly.dev" }
 
 [env]
-  NEXT_PUBLIC_API_URL = "https://cspf-backend.fly.dev"
+  NEXT_PUBLIC_API_URL = "https://cspf-backend-colin.fly.dev"
 
 [http_service]
   internal_port = 3000
