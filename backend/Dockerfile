@@ -28,4 +28,4 @@ COPY download-cache.sh /app/
 RUN chmod +x /app/download-cache.sh
 
 EXPOSE 8080
-ENTRYPOINT ["sh", "-c", "/app/download-cache.sh && java $JAVA_OPTS -jar /app/app.jar"]
+ENTRYPOINT ["sh", "-c", "/app/download-cache.sh && java $JAVA_OPTS -Dserver.address=0.0.0.0 -jar /app/app.jar"]
