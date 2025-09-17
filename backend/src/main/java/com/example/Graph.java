@@ -30,8 +30,6 @@ public class Graph implements Serializable {
         
         new Thread(() -> {
             try {
-                // First try to download cache if it doesn't exist
-                downloadCacheIfNeeded();
                 loadOrBuild();
             } catch (IOException e) {
                 System.err.println("Failed to load graph asynchronously: " + e.getMessage());
@@ -39,27 +37,6 @@ public class Graph implements Serializable {
                 statusMessage = "Failed to load: " + e.getMessage();
             }
         }).start();
-    }
-    
-    private void downloadCacheIfNeeded() {
-        String cacheFile = System.getenv().getOrDefault("GRAPH_CACHE_FILE", "/tmp/graph-cache.bin");
-        if (!Files.exists(Paths.get(cacheFile))) {
-            System.out.println("Cache file not found, downloading...");
-            try {
-                ProcessBuilder pb = new ProcessBuilder("wget", "-c", "-O", cacheFile, 
-                    "https://github.com/cjprice2/CelebrityShortestPathFinder/releases/download/v1.1.0/graph-cache.bin",
-                    "--timeout=30", "--tries=3");
-                Process process = pb.start();
-                int exitCode = process.waitFor();
-                if (exitCode == 0) {
-                    System.out.println("Cache downloaded successfully");
-                } else {
-                    System.out.println("Failed to download cache, will build from scratch");
-                }
-            } catch (Exception e) {
-                System.err.println("Error downloading cache: " + e.getMessage());
-            }
-        }
     }
 
     public Graph() throws IOException {
@@ -85,12 +62,14 @@ public class Graph implements Serializable {
         String castFile = Paths.get(resourceDir, "cast.csv.gz").toString();
         String cacheFile = System.getenv().getOrDefault("GRAPH_CACHE_FILE", "/tmp/graph-cache.bin");
         
-        boolean canUseCache = Files.isRegularFile(Paths.get(cacheFile)) && Files.isRegularFile(Paths.get(castFile));
-        if (canUseCache) {
+        boolean canUseCache = Files.isRegularFile(Paths.get(cacheFile));
+        if (canUseCache && Files.isRegularFile(Paths.get(castFile))) {
+            // If both cache and source exist, check if cache is newer
             long cacheMtime = Files.getLastModifiedTime(Paths.get(cacheFile)).toMillis();
             long castMtime = Files.getLastModifiedTime(Paths.get(castFile)).toMillis();
             canUseCache = cacheMtime >= castMtime;
         }
+        // If only cache exists (cache-only mode), use it directly
         
         if (canUseCache) {
             try (ObjectInputStream in = new ObjectInputStream(new BufferedInputStream(Files.newInputStream(Paths.get(cacheFile))))) {

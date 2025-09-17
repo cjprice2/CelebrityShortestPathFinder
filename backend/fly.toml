@@ -28,4 +28,4 @@ primary_region = 'ord'
     path = "/api/health"
 
 [[vm]]
-  size = 'shared-cpu-1x'
+  size = 'shared-cpu-8x'

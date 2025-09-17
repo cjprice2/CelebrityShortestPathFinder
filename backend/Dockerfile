@@ -16,6 +16,9 @@ RUN --mount=type=cache,target=/root/.m2 mvn -q -DskipTests package
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
+# Install curl for cache downloading (more memory efficient)
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # Copy the built JAR
 COPY --from=build /app/target/*.jar /app/app.jar
 
@@ -29,4 +32,4 @@ RUN chmod +x /app/download-cache.sh
 
 EXPOSE 8080
 ENV SERVER_ADDRESS=0.0.0.0
-ENTRYPOINT ["java", "$JAVA_OPTS", "-Dserver.address=0.0.0.0", "-jar", "/app/app.jar"]
+ENTRYPOINT ["/bin/sh", "-c", "curl -L -o /tmp/graph-cache.bin https://github.com/cjprice2/CelebrityShortestPathFinder/releases/download/v1.1.0/graph-cache.bin --connect-timeout 30 --max-time 600 --retry 3 && java -Xmx1500m -Xms512m $JAVA_OPTS -Dserver.address=0.0.0.0 -jar /app/app.jar"]
