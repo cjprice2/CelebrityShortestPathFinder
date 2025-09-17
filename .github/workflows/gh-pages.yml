@@ -22,9 +22,17 @@ jobs:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: 'frontend/package.json'
-      - run: npm ci
+      - run: npm install -g npm@11.6.0
+      - run: npm ci --no-fund --no-audit
         working-directory: frontend
-      - run: npm run export
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: frontend/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('frontend/package-lock.json') }}-${{ hashFiles('frontend/**/*.js', 'frontend/**/*.jsx', 'frontend/**/*.ts', 'frontend/**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('frontend/package-lock.json') }}-
+      - run: npm run build
         working-directory: frontend
       - uses: actions/upload-pages-artifact@v3
         with:
