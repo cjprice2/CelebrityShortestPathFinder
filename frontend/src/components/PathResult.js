@@ -1,5 +1,6 @@
 import { FaArrowsAltH } from "react-icons/fa";
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 
 function parseResult(result) {
   // Split the result into lines
@@ -90,7 +91,7 @@ export default function PathResult({ result }) {
             {/* This block now has a fixed width for consistency */}
             <div className="flex flex-col items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 text-white w-16 sm:w-20 md:w-24 lg:w-28">
               {celebrityPhotos[celebrity] ? (
-                <img src={celebrityPhotos[celebrity]} alt={celebrity} className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-18 lg:h-18 xl:w-20 xl:h-20 rounded-lg object-cover border-2 border-white" />
+                <Image src={celebrityPhotos[celebrity]} alt={celebrity} width={80} height={80} className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-18 lg:h-18 xl:w-20 xl:h-20 rounded-lg object-cover border-2 border-white" />
               ) : (
                 <div className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-18 lg:h-18 xl:w-20 xl:h-20 rounded-lg bg-blue-800 flex items-center justify-center text-white font-bold border-2 border-white text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl">
                   {celebrity.charAt(0)}
