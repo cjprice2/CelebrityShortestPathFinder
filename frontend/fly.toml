@@ -1,0 +1,22 @@
+# Frontend Fly.io configuration
+app = "cspf-frontend"
+primary_region = "iad"
+
+[build]
+  args = { NEXT_PUBLIC_API_URL = "https://cspf-backend.fly.dev" }
+
+[env]
+  NEXT_PUBLIC_API_URL = "https://cspf-backend.fly.dev"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1

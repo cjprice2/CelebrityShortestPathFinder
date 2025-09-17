@@ -6,6 +6,10 @@ backend/target/
 frontend/.next/
 frontend/out/
 
+# AWS deployment files
+aws
+awscliv2.zip
+
 # IDE settings
 /.idea/
 /*.iml
@@ -39,6 +43,7 @@ node_modules
 
 # environment variables
 .env
+.env.deploy
 
 # Build artifacts
 *.class

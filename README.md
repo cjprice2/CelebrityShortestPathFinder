@@ -63,7 +63,29 @@ This app is designed for efficient hosting:
 - **Local data files** - uses cast.csv.gz for celebrity/title data
 - **Small memory footprint** - optimized graph structure
 - **Fast startup** - loads from cache when available
-- **Works on Heroku, Railway, etc.**
+- **Works on Vercel (frontend) + any Java host (backend)**
+
+### Deploy Frontend on Vercel (recommended)
+
+1. Push this repo to GitHub.
+2. In Vercel, import the `frontend/` directory as a project.
+3. Set Environment Variables for the project:
+   - `NEXT_PUBLIC_API_URL` = Public URL of your backend (e.g. `https://your-backend.onrender.com`)
+4. Build & Deploy. Vercel will give you a production URL.
+
+Notes:
+- The frontend reads the backend URL from `NEXT_PUBLIC_API_URL` (see `frontend/next.config.mjs`).
+- If you deploy the backend later, just update the Vercel environment variable and redeploy.
+
+### Deploy Backend (choose one)
+
+- Render/Railway/Heroku: Deploy the `backend/` as a Java 21 Spring Boot app.
+  - Set env vars:
+    - `TMDB_API_KEY` (required)
+    - `GRAPH_CACHE_FILE` (optional, default `/tmp/graph-cache.bin`)
+    - `GRAPH_RESOURCE_DIR` (optional, default `backend/src/main/resources`)
+  - Expose port `8080`.
+- Docker host: Build the `backend/Dockerfile` and run with the same env vars.
 
 ## Environment Variables
 
