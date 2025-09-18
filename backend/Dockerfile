@@ -24,6 +24,9 @@ COPY --from=build /app/target/*.jar /app/app.jar
 # Copy data processing scripts (optional, for data generation)
 COPY --from=build /app/src/main/resources/process_imdb_data.py /app/
 
+# Copy pre-built cache to volume (temporary - for first deployment)
+COPY graph-cache.bin /data/graph-cache.bin
+
 EXPOSE 8080
 ENV SERVER_ADDRESS=0.0.0.0
 ENV PORT=8080
