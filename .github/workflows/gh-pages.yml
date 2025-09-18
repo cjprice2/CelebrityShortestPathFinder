@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_PAGES: 'true'
-      NEXT_PUBLIC_API_URL: 'celebrity-shortest-path-production.up.railway.app'
+      NEXT_PUBLIC_API_URL: 'https://celebrity-shortest-path-production.up.railway.app'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
