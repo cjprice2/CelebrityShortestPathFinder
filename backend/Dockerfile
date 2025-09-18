@@ -4,13 +4,13 @@ WORKDIR /app
 
 # Leverage dependency layer caching
 COPY backend/pom.xml ./
-RUN --mount=type=cache,id=s/523342f2-3005-4f92-bd83-c9046975218b-/root/.m2,target=/root/.m2 mvn -q -DskipTests dependency:go-offline
+RUN --mount=type=cache,id=s/73616753-6fb3-4cd8-b40c-5be58e266018-/root/.m2,target=/root/.m2 mvn -q -DskipTests dependency:go-offline
 
 # Copy sources (including resources with the data files)
 COPY backend/src ./src
 
 # Package the app (skip tests) with Maven repo cache
-RUN --mount=type=cache,id=s/523342f2-3005-4f92-bd83-c9046975218b-/root/.m2,target=/root/.m2 mvn -q -DskipTests package
+RUN --mount=type=cache,id=s/73616753-6fb3-4cd8-b40c-5be58e266018-/root/.m2,target=/root/.m2 mvn -q -DskipTests package
 # Runtime stage
 FROM eclipse-temurin:21-jre
 WORKDIR /app
