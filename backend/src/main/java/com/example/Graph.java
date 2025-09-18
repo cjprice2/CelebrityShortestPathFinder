@@ -716,7 +716,7 @@ public class Graph implements Serializable {
         titleNames = new String[0];
         titleIds = new String[0];
         adjacencyList = new int[0][];
-        celebrityCount = 0;
+        celebrityCount = new int[0];
         titleCelebrities = new int[0][];
         titleCelebrityCount = new int[0];
         System.out.println("Empty graph initialized - ready to load from cache");
