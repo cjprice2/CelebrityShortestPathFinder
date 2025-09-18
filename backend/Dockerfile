@@ -4,13 +4,13 @@ WORKDIR /app
 
 # Leverage dependency layer caching
 COPY pom.xml ./
-RUN --mount=type=cache,target=/root/.m2 mvn -q -DskipTests dependency:go-offline
+RUN --mount=type=cache,id=maven-cache,target=/root/.m2 mvn -q -DskipTests dependency:go-offline
 
 # Copy sources (including resources with the data files)
 COPY src ./src
 
 # Package the app (skip tests) with Maven repo cache
-RUN --mount=type=cache,target=/root/.m2 mvn -q -DskipTests package
+RUN --mount=type=cache,id=maven-cache,target=/root/.m2 mvn -q -DskipTests package
 
 # Runtime stage
 FROM eclipse-temurin:21-jre
