@@ -198,7 +198,9 @@ public class Graph implements Serializable {
         
         if (!Files.isRegularFile(Paths.get(castFile))) {
             System.err.println("Source data file not found: " + castFile);
-            System.err.println("Cannot build graph without source data");
+            System.err.println("Initializing empty graph - will load from cache if available");
+            // Initialize empty graph structures to prevent null pointer exceptions
+            initializeEmptyGraph();
             return;
         }
         
@@ -705,5 +707,18 @@ public class Graph implements Serializable {
         
         result.add(current.toString());
         return result;
+    }
+    
+    private void initializeEmptyGraph() {
+        System.out.println("Initializing empty graph structures...");
+        celebrityNames = new String[0];
+        celebrityIds = new String[0];
+        titleNames = new String[0];
+        titleIds = new String[0];
+        adjacencyList = new int[0][];
+        celebrityCount = 0;
+        titleCelebrities = new int[0][];
+        titleCelebrityCount = new int[0];
+        System.out.println("Empty graph initialized - ready to load from cache");
     }
 }
