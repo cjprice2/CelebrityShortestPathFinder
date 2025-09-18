@@ -7,7 +7,6 @@ services:
       - "8080:8080"
     volumes:
       - ./backend/src/main/resources:/app/src/main/resources:ro
-      - graph-cache:/app
     environment:
       - JAVA_OPTS=-Xmx4g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication
       - TMDB_API_KEY=${TMDB_API_KEY}
@@ -31,6 +30,3 @@ services:
       - "3000:3000"
     depends_on:
       - backend
-
-volumes:
-  graph-cache: {}

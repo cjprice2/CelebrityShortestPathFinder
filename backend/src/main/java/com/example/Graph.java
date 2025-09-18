@@ -131,13 +131,11 @@ public class Graph implements Serializable {
         if (castFile == null || castFile.trim().isEmpty()) {
             throw new IOException("Invalid cast file path: " + castFile);
         }
-        String volumeMountPath = System.getenv("RAILWAY_VOLUME_MOUNT_PATH");
-        String cacheFile = System.getenv().getOrDefault("GRAPH_CACHE_FILE", 
-            volumeMountPath != null ? volumeMountPath + "/graph-cache.bin" : "./graph-cache.bin");
+        // Use built-in cache (no environment variable needed)
+        String cacheFile = "/app/graph-cache.bin";
         
         System.out.println("Resource directory: " + resourceDir);
         System.out.println("Cast file: " + castFile);
-        System.out.println("RAILWAY_VOLUME_MOUNT_PATH: " + volumeMountPath);
         System.out.println("Cache file: " + cacheFile);
         
         // Test if paths are valid
