@@ -21,9 +21,6 @@ RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
 # Copy the built JAR
 COPY --from=build /app/target/*.jar /app/app.jar
 
-# Create volume mount point
-VOLUME ["/data"]
-
 EXPOSE 8080
 ENV SERVER_ADDRESS=0.0.0.0
 ENV PORT=8080
