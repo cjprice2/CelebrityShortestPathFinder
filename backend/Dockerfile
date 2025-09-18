@@ -3,11 +3,11 @@ FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
 
 # Leverage dependency layer caching
-COPY pom.xml ./
+COPY backend/pom.xml ./
 RUN --mount=type=cache,id=s/523342f2-3005-4f92-bd83-c9046975218b-/root/.m2,target=/root/.m2 mvn -q -DskipTests dependency:go-offline
 
 # Copy sources (including resources with the data files)
-COPY src ./src
+COPY backend/src ./src
 
 # Package the app (skip tests) with Maven repo cache
 RUN --mount=type=cache,id=s/523342f2-3005-4f92-bd83-c9046975218b-/root/.m2,target=/root/.m2 mvn -q -DskipTests package
