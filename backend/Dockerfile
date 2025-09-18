@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/target/*.jar /app/app.jar
 
 # Copy graph cache into the image (workaround for broken Railway volumes)
-COPY graph-cache.bin /app/graph-cache.bin
+COPY backend/graph-cache.bin /app/graph-cache.bin
 
 EXPOSE 8080
 ENV SERVER_ADDRESS=0.0.0.0
