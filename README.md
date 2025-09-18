@@ -1,11 +1,11 @@
 # Celebrity Shortest Path Finder
 
-A modern web application that finds the shortest path between two celebrities through their shared titles, using the TMDB API.
+A modern web application that finds the shortest path between two celebrities through their shared titles, using IMDb Non-Commercial Datasets and TMDB API for photos.
 
 ## Features
 
 - Find shortest path between any two celebrities
-- Real-time data from TMDB API
+- Real-time photo data from TMDB API
 - Fast startup with graph cache
 - Free to host (uses TMDB's free API)
 
