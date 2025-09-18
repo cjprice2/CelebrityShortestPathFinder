@@ -44,7 +44,7 @@ backend/src/main/resources/cast.csv.gz
 backend/src/main/resources/name.basics.tsv.gz
 backend/src/main/resources/title.basics.tsv.gz
 backend/src/main/resources/title.principals.tsv.gz
-backend/src/main/resources/convert_to_cytoscape.py
+backend/graph-cache.bin
 backend/src/main/resources/process_imdb_data.py
 
 # Maven build output

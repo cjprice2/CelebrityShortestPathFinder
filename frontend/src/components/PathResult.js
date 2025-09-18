@@ -18,9 +18,8 @@ function parseResult(result) {
   const titleIdsLine = lines.find(line => line.startsWith("MOVIE_IDS:"));
   const titleIds = titleIdsLine ? titleIdsLine.replace("MOVIE_IDS:", "").split(",").filter(id => id) : [];
 
-  // First non-marker line should be the celebrities
-  const firstContentLineIdx = lines.findIndex(l => !l.startsWith("START_ID:") && !l.startsWith("END_ID:"));
-  const celebrities = (firstContentLineIdx >= 0 ? lines[firstContentLineIdx] : "").split(" -> ");
+  // First line should be the celebrities (names separated by " -> ")
+  const celebrities = lines[0] ? lines[0].split(" -> ") : [];
 
   // Structured titles only; no legacy fallback
   const titleNamesLine = lines.find(line => line.startsWith("MOVIE_TITLES:"));
@@ -44,7 +43,7 @@ export default function PathResult({ result }) {
   const fetchCelebrityPhoto = useCallback(async (celebrityName, celebrityId, signal) => {
     if (celebrityPhotos[celebrityName] || !celebrityId) return;
     try {
-      const url = `/api/celebrity-photo?celebrityId=${encodeURIComponent(celebrityId)}&celebrityName=${encodeURIComponent(celebrityName)}`;
+      const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/celebrity-photo?celebrityId=${encodeURIComponent(celebrityId)}&celebrityName=${encodeURIComponent(celebrityName)}`;
       const response = await fetch(url, { signal });
       if (!response.ok) return;
       const data = await response.json();
