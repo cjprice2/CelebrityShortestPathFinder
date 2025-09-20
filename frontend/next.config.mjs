@@ -1,14 +1,14 @@
 /** @type {import('next').NextConfig} */
+const isGhPages = process.env.GITHUB_PAGES === 'true';
+const repoName = 'CelebrityShortestPathFinder';
+
 const nextConfig = {
-  async rewrites() {
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${backendUrl}/api/:path*`,
-      },
-    ];
-  },
+  output: 'export',
+  images: { unoptimized: true },
+  // Only needed if deploying to project pages (username.github.io/repo)
+  basePath: isGhPages ? `/${repoName}` : undefined,
+  assetPrefix: isGhPages ? `/${repoName}/` : undefined,
+  experimental: {},
 };
 
 export default nextConfig;

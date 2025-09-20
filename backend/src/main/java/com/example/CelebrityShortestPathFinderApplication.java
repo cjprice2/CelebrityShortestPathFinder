@@ -12,6 +12,8 @@ import org.springframework.web.client.RestTemplate;
 public class CelebrityShortestPathFinderApplication {
 
     public static void main(String[] args) {
+        System.setProperty("server.address", "0.0.0.0");
+        System.setProperty("server.port", "8080");
         SpringApplication.run(CelebrityShortestPathFinderApplication.class, args);
     }
 
@@ -19,8 +21,7 @@ public class CelebrityShortestPathFinderApplication {
     public static class AppConfig {
 
         @Bean
-        public Graph graph() throws java.io.IOException {
-            // Build or load cached graph at startup
+        public Graph graph() throws Exception {
             return new Graph();
         }
         

@@ -1,5 +1,6 @@
 import { FaArrowsAltH } from "react-icons/fa";
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 
 function parseResult(result) {
   // Split the result into lines
@@ -17,9 +18,8 @@ function parseResult(result) {
   const titleIdsLine = lines.find(line => line.startsWith("MOVIE_IDS:"));
   const titleIds = titleIdsLine ? titleIdsLine.replace("MOVIE_IDS:", "").split(",").filter(id => id) : [];
 
-  // First non-marker line should be the celebrities
-  const firstContentLineIdx = lines.findIndex(l => !l.startsWith("START_ID:") && !l.startsWith("END_ID:"));
-  const celebrities = (firstContentLineIdx >= 0 ? lines[firstContentLineIdx] : "").split(" -> ");
+  // First line should be the celebrities (names separated by " -> ")
+  const celebrities = lines[0] ? lines[0].split(" -> ") : [];
 
   // Structured titles only; no legacy fallback
   const titleNamesLine = lines.find(line => line.startsWith("MOVIE_TITLES:"));
@@ -43,7 +43,7 @@ export default function PathResult({ result }) {
   const fetchCelebrityPhoto = useCallback(async (celebrityName, celebrityId, signal) => {
     if (celebrityPhotos[celebrityName] || !celebrityId) return;
     try {
-      const url = `/api/celebrity-photo?celebrityId=${encodeURIComponent(celebrityId)}&celebrityName=${encodeURIComponent(celebrityName)}`;
+      const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/celebrity-photo?celebrityId=${encodeURIComponent(celebrityId)}&celebrityName=${encodeURIComponent(celebrityName)}`;
       const response = await fetch(url, { signal });
       if (!response.ok) return;
       const data = await response.json();
@@ -73,7 +73,7 @@ export default function PathResult({ result }) {
     });
     
     return () => abortController.abort();
-  }, [parsed?.celebrities?.join(','), parsed?.celebrityIds?.join(','), fetchCelebrityPhoto]);
+  }, [parsed, fetchCelebrityPhoto]);
 
   if (!parsed) return <div className="text-gray-400">No path found.</div>;
 
@@ -90,7 +90,7 @@ export default function PathResult({ result }) {
             {/* This block now has a fixed width for consistency */}
             <div className="flex flex-col items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 text-white w-16 sm:w-20 md:w-24 lg:w-28">
               {celebrityPhotos[celebrity] ? (
-                <img src={celebrityPhotos[celebrity]} alt={celebrity} className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-18 lg:h-18 xl:w-20 xl:h-20 rounded-lg object-cover border-2 border-white" />
+                <Image src={celebrityPhotos[celebrity]} alt={celebrity} width={80} height={80} className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-18 lg:h-18 xl:w-20 xl:h-20 rounded-lg object-cover border-2 border-white" />
               ) : (
                 <div className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-18 lg:h-18 xl:w-20 xl:h-20 rounded-lg bg-blue-800 flex items-center justify-center text-white font-bold border-2 border-white text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl">
                   {celebrity.charAt(0)}

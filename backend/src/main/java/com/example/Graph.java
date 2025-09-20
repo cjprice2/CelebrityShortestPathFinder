@@ -6,186 +6,469 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public class Graph implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    // Graph structures
-    private Map<String, List<String>> adjacencyList = new HashMap<>(); // celebrity ID -> neighbor celebrity IDs
-    private Map<String, String> celebrityNames = new HashMap<>(); // celebrity ID -> name
-    private Map<String, String> titleNames = new HashMap<>(); // title ID -> title name
-    private Map<String, Set<String>> celebrityTitles = new HashMap<>(); // celebrity ID -> set of title IDs
+    // Hybrid array-based graph structures with HashMap lookups for O(1) access
+    private String[] celebrityNames; // index -> celebrity name
+    private String[] celebrityIds; // index -> celebrity ID (for reverse lookup)
+    private String[] titleNames; // index -> title name
+    private String[] titleIds; // index -> title ID (for reverse lookup)
+    private int[][] adjacencyList; // celebrity index -> array of neighbor celebrity indices
+    private int[] celebrityCount; // number of neighbors for each celebrity
+    
+    // Title-celebrity mapping for finding common titles
+    private int[][] titleCelebrities; // title index -> array of celebrity indices in this title
+    private int[] titleCelebrityCount; // number of celebrities for each title
+    
+    // Fast lookup maps for O(1) access (built after array conversion)
+    private transient Map<String, Integer> celebrityIdToIndex;
+    private transient Map<String, Integer> titleIdToIndex;
+    
+    // Temporary structures for building (cleared after build)
+    private transient List<String> tempCelebrityIds = new ArrayList<>();
+    private transient List<String> tempCelebrityNames = new ArrayList<>();
+    private transient List<String> tempTitleIds = new ArrayList<>();
+    private transient List<String> tempTitleNames = new ArrayList<>();
+    private transient List<List<String>> tempCelebrityTitles = new ArrayList<>();
+    private transient List<List<String>> tempNeighborSets = new ArrayList<>();
 
-    // Build status
-    private volatile boolean building = false;
-    private volatile String statusMessage = "";
-
-    public boolean isBuilding() { return building; }
-    public String getStatusMessage() { return statusMessage; }
+    
+    // Helper method to find celebrity index by ID (O(1) HashMap lookup)
+    private int findCelebrityIndex(String celebrityId) {
+        if (celebrityIdToIndex == null) {
+            // Fallback to linear search if maps not built yet
+            if (celebrityIds == null) return -1;
+            for (int i = 0; i < celebrityIds.length; i++) {
+                if (celebrityIds[i] != null && celebrityIds[i].equals(celebrityId)) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+        return celebrityIdToIndex.getOrDefault(celebrityId, -1);
+    }
+    
+    
+    // Fast search method that uses arrays directly (no duplicate data structures)
+    public List<Map.Entry<String, String>> searchCelebrities(String query, int maxResults) {
+        List<Map.Entry<String, String>> results = new ArrayList<>();
+        String lowerQuery = query.toLowerCase().trim();
+        
+        // Search directly through the arrays - no need for cached collections
+        if (celebrityNames != null && celebrityIds != null) {
+            for (int i = 0; i < celebrityNames.length; i++) {
+                if (celebrityNames[i] != null && celebrityIds[i] != null && 
+                    celebrityNames[i].toLowerCase().contains(lowerQuery)) {
+                    results.add(Map.entry(celebrityIds[i], celebrityNames[i]));
+                    if (results.size() >= maxResults) break;
+                }
+            }
+        }
+        
+        return results;
+    }
+    
 
     public Graph() throws IOException {
-        loadOrBuild();
+        System.out.println("=== GRAPH CONSTRUCTOR START ===");
+        System.out.println("Java version: " + System.getProperty("java.version"));
+        System.out.println("OS: " + System.getProperty("os.name"));
+        System.out.println("User dir: " + System.getProperty("user.dir"));
+        System.out.println("Temp dir: " + System.getProperty("java.io.tmpdir"));
+        
+        try {
+            loadOrBuild();
+            System.out.println("=== GRAPH CONSTRUCTOR END - SUCCESS ===");
+        } catch (Exception e) {
+            System.err.println("=== GRAPH CONSTRUCTOR END - FAILED ===");
+            System.err.println("Error in Graph constructor: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 
-    @SuppressWarnings("unchecked")
     private void loadOrBuild() throws IOException {
         String resourceDir = System.getenv().getOrDefault("GRAPH_RESOURCE_DIR", "backend/src/main/resources");
+        if (resourceDir == null || resourceDir.trim().isEmpty()) {
+            resourceDir = "backend/src/main/resources";
+        }
         String castFile = Paths.get(resourceDir, "cast.csv.gz").toString();
-        String cacheFile = System.getenv().getOrDefault("GRAPH_CACHE_FILE", "/tmp/graph-cache.bin");
         
-        boolean canUseCache = Files.isRegularFile(Paths.get(cacheFile)) && Files.isRegularFile(Paths.get(castFile));
+        // Validate paths
+        if (resourceDir == null || resourceDir.trim().isEmpty()) {
+            throw new IOException("Invalid resource directory: " + resourceDir);
+        }
+        if (castFile == null || castFile.trim().isEmpty()) {
+            throw new IOException("Invalid cast file path: " + castFile);
+        }
+        // Use built-in cache (no environment variable needed)
+        String cacheFile = "/app/graph-cache.bin.gz";
+        
+        System.out.println("Resource directory: " + resourceDir);
+        System.out.println("Cast file: " + castFile);
+        System.out.println("Cache file: " + cacheFile);
+        
+        // Test if paths are valid
+        try {
+            java.nio.file.Path testPath = Paths.get(cacheFile);
+            System.out.println("Cache path test: " + testPath.toAbsolutePath() + " - VALID");
+        } catch (Exception e) {
+            System.err.println("Cache path test FAILED: " + e.getMessage());
+        }
+        
+        try {
+            java.nio.file.Path testPath = Paths.get(castFile);
+            System.out.println("Cast path test: " + testPath.toAbsolutePath() + " - VALID");
+        } catch (Exception e) {
+            System.err.println("Cast path test FAILED: " + e.getMessage());
+        }
+        
+        
+        boolean canUseCache = Files.isRegularFile(Paths.get(cacheFile));
         if (canUseCache) {
-            long cacheMtime = Files.getLastModifiedTime(Paths.get(cacheFile)).toMillis();
-            long castMtime = Files.getLastModifiedTime(Paths.get(castFile)).toMillis();
-            canUseCache = cacheMtime >= castMtime;
+            // If cache exists, use it regardless of source file timestamp
+            // This allows pre-built caches to be used in production
+            System.out.println("Using pre-built graph cache from: " + cacheFile);
+        } else if (Files.isRegularFile(Paths.get(castFile))) {
+            // Only check source file if no cache exists
+            System.out.println("No cache found, will build from source data: " + castFile);
+            canUseCache = false; // Force building from source
         }
         
         if (canUseCache) {
-            try (ObjectInputStream in = new ObjectInputStream(new BufferedInputStream(Files.newInputStream(Paths.get(cacheFile))))) {
-                adjacencyList = (Map<String, List<String>>) in.readObject();
-                celebrityNames = (Map<String, String>) in.readObject();
-                titleNames = (Map<String, String>) in.readObject();
-                celebrityTitles = (Map<String, Set<String>>) in.readObject();
-                System.out.println("Loaded graph from cache");
-                System.out.println("Titles: " + titleNames.size() + 
-                        ", Celebrities: " + celebrityNames.size() + 
-                        ", edges: " + (adjacencyList.values().stream().mapToInt(List::size).sum() / 2));
-                return;
-            } catch (ClassNotFoundException e) {
-                System.out.println("Cache format mismatch, rebuilding graph...");
-            } catch (IOException ioe) {
-                System.out.println("Failed to read cache (" + cacheFile + "): " + ioe.getMessage());
+            try (ObjectInputStream in = new ObjectInputStream(new BufferedInputStream(new GZIPInputStream(Files.newInputStream(Paths.get(cacheFile))), 64 * 1024))) {
+                // Load array-based data structures with larger buffer for better performance
+                System.out.println("Loading graph from cache...");
+                celebrityNames = (String[]) in.readObject();
+                System.out.println("Loaded celebrity names: " + (celebrityNames != null ? celebrityNames.length : 0));
+                celebrityIds = (String[]) in.readObject();
+                System.out.println("Loaded celebrity IDs: " + (celebrityIds != null ? celebrityIds.length : 0));
+                titleNames = (String[]) in.readObject();
+                System.out.println("Loaded title names: " + (titleNames != null ? titleNames.length : 0));
+                titleIds = (String[]) in.readObject();
+                System.out.println("Loaded title IDs: " + (titleIds != null ? titleIds.length : 0));
+                adjacencyList = (int[][]) in.readObject();
+                System.out.println("Loaded adjacency list: " + (adjacencyList != null ? adjacencyList.length : 0));
+                celebrityCount = (int[]) in.readObject();
+                titleCelebrities = (int[][]) in.readObject();
+                titleCelebrityCount = (int[]) in.readObject();
+                // Check if cache has the new structure (titleNames should not be equal to titleIds)
+                if (titleNames == null || (titleIds != null && titleNames.length == titleIds.length && java.util.Arrays.equals(titleNames, titleIds))) {
+                    System.out.println("Cache has old structure (title names = IDs), rebuilding...");
+                    canUseCache = false;
+                } else {
+                    System.out.println("Graph loaded successfully from cache");
+                    buildLookupMaps(); // Build fast lookup maps after loading
+                    return;
+                }
+            } catch (ClassNotFoundException | IOException e) {
+                System.out.println("Cache invalid or corrupted, will rebuild: " + e.getMessage());
+                // Cache invalid, will rebuild
             }
         }
         
         if (!Files.isRegularFile(Paths.get(castFile))) {
-            throw new IOException("Cast file not found: " + castFile);
+            System.err.println("Source data file not found: " + castFile);
+            System.err.println("Initializing empty graph - will load from cache if available");
+            // Initialize empty graph structures to prevent null pointer exceptions
+            initializeEmptyGraph();
+            return;
         }
         
+        System.out.println("Building graph from source data...");
         buildFromCastData(castFile);
+        buildLookupMaps(); // Build fast lookup maps after building
         saveCache(cacheFile);
     }
 
     private void buildFromCastData(String castFile) throws IOException {
-        System.out.println("Building graph from cast data...");
-        building = true;
-        statusMessage = "Loading cast data";
-        int titleCount = loadCastData(castFile);
-        trimAdjacencyLists();
-        System.out.println("Finished building graph. Titles: " + titleCount + 
-                ", Celebrities: " + celebrityNames.size() + 
-                ", edges: " + (adjacencyList.values().stream().mapToInt(List::size).sum() / 2));
-        statusMessage = "Done";
-        building = false;
+        loadCastData(castFile);
+        convertToOptimizedFormat();
     }
 
     private int loadCastData(String castFile) throws IOException {
-        Map<String, Set<String>> neighborSets = new HashMap<>();
+        System.out.println("Loading cast data from: " + castFile);
+        tempCelebrityIds.clear();
+        tempCelebrityNames.clear();
+        tempTitleIds.clear();
+        tempCelebrityTitles.clear();
+        tempNeighborSets.clear();
+        
+        Map<String, Integer> celebrityIdToIndex = new HashMap<>();
+        Map<String, Integer> titleIdToIndex = new HashMap<>();
         Map<String, Set<String>> titleCelebrities = new HashMap<>();
         
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new GZIPInputStream(Files.newInputStream(Paths.get(castFile))), StandardCharsets.UTF_8))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new GZIPInputStream(Files.newInputStream(Paths.get(castFile))), StandardCharsets.UTF_8), 64 * 1024)) {
             reader.readLine(); // header
             String line;
-            long count = 0L;
+            int lineCount = 0;
             while ((line = reader.readLine()) != null) {
+                lineCount++;
+                if (lineCount % 100000 == 0) {
+                    System.out.println("Processed " + lineCount + " lines, celebrities: " + tempCelebrityIds.size() + ", titles: " + tempTitleIds.size());
+                    // Force garbage collection periodically to free memory
+                    System.gc();
+                }
+                
                 List<String> parts = parseCSVLine(line);
                 if (parts.size() < 4) continue;
                 
                 String titleId = parts.get(0);
-                String titleName = parts.get(1);
+                String titleName = parts.size() > 1 ? parts.get(1) : titleId; // Use title name if available, fallback to ID
                 String celebrityIdsStr = parts.get(2);
                 String celebrityNamesStr = parts.get(3);
                 
                 List<String> celebrityIds = celebrityIdsStr.isEmpty() ? List.of() : Arrays.asList(celebrityIdsStr.split(","));
                 List<String> names = celebrityNamesStr.isEmpty() ? List.of() : Arrays.asList(celebrityNamesStr.split(","));
                 
-                titleNames.put(titleId, titleName);
-                
                 if (celebrityIds.size() >= 2) {
+                    // Add title if not seen
+                    if (!titleIdToIndex.containsKey(titleId)) {
+                        titleIdToIndex.put(titleId, tempTitleIds.size());
+                        tempTitleIds.add(titleId);
+                        tempTitleNames.add(titleName);
+                    }
+                    
+                    // Add celebrities and build title-celebrity relationships
                     for (int i = 0; i < celebrityIds.size(); i++) {
                         String celebrityId = celebrityIds.get(i);
                         String celebrityName = names.get(i);
                         
-                        celebrityNames.put(celebrityId, celebrityName);
+                        if (!celebrityIdToIndex.containsKey(celebrityId)) {
+                            celebrityIdToIndex.put(celebrityId, tempCelebrityIds.size());
+                            tempCelebrityIds.add(celebrityId);
+                            tempCelebrityNames.add(celebrityName);
+                            tempCelebrityTitles.add(new ArrayList<>());
+                            tempNeighborSets.add(new ArrayList<>());
+                        }
+                        
+                        int celebrityIndex = celebrityIdToIndex.get(celebrityId);
+                        tempCelebrityTitles.get(celebrityIndex).add(titleId);
                         titleCelebrities.computeIfAbsent(titleId, k -> new HashSet<>()).add(celebrityId);
-                        celebrityTitles.computeIfAbsent(celebrityId, k -> new HashSet<>()).add(titleId);
                     }
                 }
-                
-                if ((++count % 50000) == 0) System.out.println("Processed titles: " + count);
             }
+            System.out.println("Finished processing " + lineCount + " lines");
         }
         
-        System.out.println("Building edges from " + titleCelebrities.size() + " titles...");
-        long edgeCount = 0;
-        int titleCount = 0;
+        // Build neighbor relationships
         for (Set<String> celebrities : titleCelebrities.values()) {
             String[] celebrityArray = celebrities.toArray(new String[0]);
-            
             for (int i = 0; i < celebrityArray.length; i++) {
                 for (int j = i + 1; j < celebrityArray.length; j++) {
                     String a = celebrityArray[i];
                     String b = celebrityArray[j];
-                    neighborSets.computeIfAbsent(a, k -> new HashSet<>()).add(b);
-                    neighborSets.computeIfAbsent(b, k -> new HashSet<>()).add(a);
-                    edgeCount++;
+                    int aIndex = celebrityIdToIndex.get(a);
+                    int bIndex = celebrityIdToIndex.get(b);
+                    tempNeighborSets.get(aIndex).add(b);
+                    tempNeighborSets.get(bIndex).add(a);
                 }
             }
-            
-            if (++titleCount % 50000 == 0) {
-                System.out.println("Processed " + titleCount + " titles, built " + edgeCount + " edges...");
-            }
-        }
-        
-        for (Map.Entry<String, Set<String>> e : neighborSets.entrySet()) {
-            adjacencyList.put(e.getKey(), new ArrayList<>(e.getValue()));
         }
         
         return titleCelebrities.size();
     }
+    
+    private void convertToOptimizedFormat() {
+        int celebrityCount = tempCelebrityIds.size();
+        int titleCount = tempTitleIds.size();
+        
+        System.out.println("Converting to optimized format: " + celebrityCount + " celebrities, " + titleCount + " titles");
+        
+        // Create arrays
+        System.out.println("Creating arrays...");
+        this.celebrityNames = tempCelebrityNames.toArray(new String[0]);
+        this.celebrityIds = tempCelebrityIds.toArray(new String[0]);
+        this.titleNames = tempTitleNames.toArray(new String[0]);
+        this.titleIds = tempTitleIds.toArray(new String[0]);
+        this.celebrityCount = new int[celebrityCount];
+        this.titleCelebrityCount = new int[titleCount];
+        
+        // Create lookup maps for O(1) access instead of O(n) indexOf
+        System.out.println("Creating lookup maps...");
+        Map<String, Integer> celebrityIdToIndex = new HashMap<>();
+        Map<String, Integer> titleIdToIndex = new HashMap<>();
+        
+        for (int i = 0; i < celebrityCount; i++) {
+            celebrityIdToIndex.put(tempCelebrityIds.get(i), i);
+        }
+        for (int i = 0; i < titleCount; i++) {
+            titleIdToIndex.put(tempTitleIds.get(i), i);
+        }
+        
+        // Count neighbors for each celebrity
+        System.out.println("Counting neighbors for celebrities...");
+        for (int i = 0; i < celebrityCount; i++) {
+            if (i % 100000 == 0) {
+                System.out.println("Processed " + i + "/" + celebrityCount + " celebrities");
+            }
+            this.celebrityCount[i] = tempNeighborSets.get(i).size();
+        }
+        
+        // Count celebrities for each title
+        System.out.println("Counting celebrities for titles...");
+        for (int i = 0; i < celebrityCount; i++) {
+            if (i % 100000 == 0) {
+                System.out.println("Processed " + i + "/" + celebrityCount + " celebrity titles");
+            }
+            for (String titleId : tempCelebrityTitles.get(i)) {
+                Integer titleIndex = titleIdToIndex.get(titleId);
+                if (titleIndex != null) {
+                    this.titleCelebrityCount[titleIndex]++;
+                }
+            }
+        }
+        
+        // Create adjacency list
+        System.out.println("Creating adjacency list...");
+        this.adjacencyList = new int[celebrityCount][];
+        for (int i = 0; i < celebrityCount; i++) {
+            if (i % 100000 == 0) {
+                System.out.println("Processed " + i + "/" + celebrityCount + " adjacency entries");
+            }
+            List<String> neighbors = tempNeighborSets.get(i);
+            int[] neighborArray = new int[neighbors.size()];
+            for (int j = 0; j < neighbors.size(); j++) {
+                Integer neighborIndex = celebrityIdToIndex.get(neighbors.get(j));
+                neighborArray[j] = (neighborIndex != null) ? neighborIndex : -1;
+            }
+            this.adjacencyList[i] = neighborArray;
+        }
+        
+        // Create title-celebrity mapping
+        System.out.println("Creating title-celebrity mapping...");
+        this.titleCelebrities = new int[titleCount][];
+        for (int i = 0; i < titleCount; i++) {
+            this.titleCelebrities[i] = new int[this.titleCelebrityCount[i]];
+        }
+        
+        // Reset counts for filling
+        Arrays.fill(this.titleCelebrityCount, 0);
+        
+        // Fill title-celebrity mapping
+        System.out.println("Filling title-celebrity mapping...");
+        for (int i = 0; i < celebrityCount; i++) {
+            if (i % 100000 == 0) {
+                System.out.println("Processed " + i + "/" + celebrityCount + " title mappings");
+            }
+            for (String titleId : tempCelebrityTitles.get(i)) {
+                Integer titleIndex = titleIdToIndex.get(titleId);
+                if (titleIndex != null) {
+                    this.titleCelebrities[titleIndex][this.titleCelebrityCount[titleIndex]++] = i;
+                }
+            }
+        }
+        
+        // Clear temporary data and force garbage collection
+        System.out.println("Clearing temporary data...");
+        tempCelebrityIds.clear();
+        tempCelebrityNames.clear();
+        tempTitleIds.clear();
+        tempCelebrityTitles.clear();
+        tempNeighborSets.clear();
+        
+        // Null out references to help GC
+        tempCelebrityIds = null;
+        tempCelebrityNames = null;
+        tempTitleIds = null;
+        tempCelebrityTitles = null;
+        tempNeighborSets = null;
+        
+        // Force garbage collection to free memory immediately
+        System.gc();
+        
+        System.out.println("Conversion completed successfully!");
+    }
+    
+    private void buildLookupMaps() {
+        System.out.println("Building fast lookup maps...");
+        
+        // Build celebrity ID to index map
+        celebrityIdToIndex = new HashMap<>();
+        if (celebrityIds != null) {
+            for (int i = 0; i < celebrityIds.length; i++) {
+                if (celebrityIds[i] != null) {
+                    celebrityIdToIndex.put(celebrityIds[i], i);
+                }
+            }
+        }
+        
+        // Build title ID to index map
+        titleIdToIndex = new HashMap<>();
+        if (titleIds != null) {
+            for (int i = 0; i < titleIds.length; i++) {
+                if (titleIds[i] != null) {
+                    titleIdToIndex.put(titleIds[i], i);
+                }
+            }
+        }
+        
+        System.out.println("Lookup maps built: " + celebrityIdToIndex.size() + " celebrities, " + titleIdToIndex.size() + " titles");
+    }
 
     private void saveCache(String cacheFile) {
         try {
+            System.out.println("=== SAVE CACHE DEBUG START ===");
+            System.out.println("Saving cache to: " + cacheFile);
+            System.out.println("Current working directory: " + System.getProperty("user.dir"));
+            
+            System.out.println("Step 1: Creating Path object...");
             java.nio.file.Path cachePath = Paths.get(cacheFile);
+            System.out.println("Resolved cache path: " + cachePath.toAbsolutePath());
+            
+            System.out.println("Step 2: Getting parent directory...");
             java.nio.file.Path parent = cachePath.getParent();
+            System.out.println("Parent directory: " + parent);
+            
             if (parent != null && !Files.exists(parent)) {
-                Files.createDirectories(parent);
+                System.out.println("Step 3: Creating parent directory: " + parent);
+                try {
+                    Files.createDirectories(parent);
+                    System.out.println("Parent directory created successfully");
+                } catch (Exception e) {
+                    System.err.println("ERROR creating parent directory: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+                    throw e;
+                }
+            } else {
+                System.out.println("Parent directory already exists or is null");
             }
-            if (Files.exists(cachePath) && Files.isDirectory(cachePath)) {
-                System.out.println("Cache path points to a directory, skipping save: " + cacheFile);
-                return;
-            }
-            try (ObjectOutputStream out = new ObjectOutputStream(new BufferedOutputStream(Files.newOutputStream(cachePath)))) {
-                out.writeObject(adjacencyList);
+            
+            System.out.println("Step 4: Creating output stream...");
+            try (ObjectOutputStream out = new ObjectOutputStream(new BufferedOutputStream(new GZIPOutputStream(Files.newOutputStream(cachePath)), 64 * 1024))) {
+                System.out.println("Output stream created successfully");
+                System.out.println("Step 5: Writing objects to cache...");
                 out.writeObject(celebrityNames);
+                out.writeObject(celebrityIds);
                 out.writeObject(titleNames);
-                out.writeObject(celebrityTitles);
-                System.out.println("Saved graph cache");
+                out.writeObject(titleIds);
+                out.writeObject(adjacencyList);
+                out.writeObject(celebrityCount);
+                out.writeObject(titleCelebrities);
+                out.writeObject(titleCelebrityCount);
+                System.out.println("All objects written successfully");
             }
+            System.out.println("=== SAVE CACHE DEBUG END - SUCCESS ===");
         } catch (IOException e) {
-            System.out.println("Failed to save cache: " + e.getMessage());
+            System.err.println("=== SAVE CACHE DEBUG END - FAILED ===");
+            System.err.println("Cache save failed: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+            e.printStackTrace();
+            // Cache save failed, continue without caching
         }
-    }
-
-    private void trimAdjacencyLists() {
-        for (List<String> neighbors : adjacencyList.values()) {
-            if (neighbors instanceof ArrayList<?> arr) {
-                arr.trimToSize();
-            }
-        }
-    }
-
-    public String findShortestPath(String startId, String endId) {
-        List<String> paths = findAllShortestPaths(startId, endId, 1);
-        return paths.isEmpty() ? "No path found." : paths.get(0);
     }
 
     public List<String> findAllShortestPaths(String startId, String endId, int maxPaths) {
         if (startId == null || endId == null || startId.isBlank() || endId.isBlank()) return List.of("Invalid IDs.");
-        if (!adjacencyList.containsKey(startId) || !adjacencyList.containsKey(endId)) return List.of("One or both IDs do not exist.");
+        
+        int startIndex = findCelebrityIndex(startId);
+        int endIndex = findCelebrityIndex(endId);
+        
+        if (startIndex == -1 || endIndex == -1) return List.of("One or both IDs do not exist.");
         if (startId.equals(endId)) return List.of(formatCelebrity(startId));
 
-        // Use bidirectional BFS to find all shortest paths
+        // Bidirectional BFS
         Map<String, List<String>> parentForward = new HashMap<>();
         Map<String, List<String>> parentBackward = new HashMap<>();
         Set<String> visitedForward = new HashSet<>();
@@ -202,66 +485,62 @@ public class Graph implements Serializable {
         parentBackward.put(endId, new ArrayList<>());
 
         List<String> meetingNodes = new ArrayList<>();
-        int shortestDistance = -1;
-        int level = 0;
 
         while (!queueForward.isEmpty() && !queueBackward.isEmpty()) {
-            level++;
-            
             // Expand forward direction
-            List<String> forwardMeeting = expandLevelBidirectional(queueForward, visitedForward, visitedBackward, parentForward);
-            if (!forwardMeeting.isEmpty() && shortestDistance == -1) {
-                shortestDistance = level;
+            List<String> forwardMeeting = expandLevel(queueForward, visitedForward, visitedBackward, parentForward);
+            if (!forwardMeeting.isEmpty()) {
                 meetingNodes.addAll(forwardMeeting);
+                break;
             }
             
             // Expand backward direction
-            List<String> backwardMeeting = expandLevelBidirectional(queueBackward, visitedBackward, visitedForward, parentBackward);
-            if (!backwardMeeting.isEmpty() && shortestDistance == -1) {
-                shortestDistance = level;
+            List<String> backwardMeeting = expandLevel(queueBackward, visitedBackward, visitedForward, parentBackward);
+            if (!backwardMeeting.isEmpty()) {
                 meetingNodes.addAll(backwardMeeting);
-            }
-
-            // If we found meeting nodes, stop
-            if (shortestDistance != -1) {
                 break;
             }
         }
 
         if (meetingNodes.isEmpty()) return List.of("No path found.");
 
-        // Generate all paths from meeting nodes
+        // Generate paths from meeting nodes
         List<String> allPaths = new ArrayList<>();
         for (String meetingNode : meetingNodes) {
             if (allPaths.size() >= maxPaths) break;
-            String path = reconstructBidirectionalPathMultiple(parentForward, parentBackward, startId, endId, meetingNode);
+            String path = reconstructPath(parentForward, parentBackward, startId, endId, meetingNode);
             allPaths.add(path);
         }
 
         return allPaths;
     }
 
-    private List<String> expandLevelBidirectional(Deque<String> queue, Set<String> visited, Set<String> otherVisited, Map<String, List<String>> parent) {
+    private List<String> expandLevel(Deque<String> queue, Set<String> visited, Set<String> otherVisited, Map<String, List<String>> parent) {
         List<String> meetingNodes = new ArrayList<>();
         int levelSize = queue.size();
         
         for (int i = 0; i < levelSize; i++) {
             String current = queue.poll();
 
-            // Check for intersection
             if (otherVisited.contains(current)) {
                 meetingNodes.add(current);
             }
 
-            List<String> neighbors = adjacencyList.get(current);
+            int currentIndex = findCelebrityIndex(current);
+            if (currentIndex == -1) continue;
+            
+            int[] neighbors = adjacencyList[currentIndex];
             if (neighbors == null) continue;
 
-            for (String neighbor : neighbors) {
-                if (visited.add(neighbor)) { // True if the neighbor was not already visited
+            // Process all neighbors in one pass to minimize lookups
+            for (int neighborIndex : neighbors) {
+                if (neighborIndex < 0 || neighborIndex >= celebrityIds.length) continue;
+                String neighbor = celebrityIds[neighborIndex]; // Direct array access
+                if (neighbor == null) continue;
+                if (visited.add(neighbor)) {
                     parent.computeIfAbsent(neighbor, k -> new ArrayList<>()).add(current);
                     queue.add(neighbor);
                 } else if (parent.containsKey(neighbor)) {
-                    // If already visited, check if this is another way to reach it at the same level
                     parent.get(neighbor).add(current);
                 }
             }
@@ -269,19 +548,19 @@ public class Graph implements Serializable {
         return meetingNodes;
     }
 
-    private String reconstructBidirectionalPathMultiple(Map<String, List<String>> parentForward, Map<String, List<String>> parentBackward, String startId, String endId, String meetingNode) {
+    private String reconstructPath(Map<String, List<String>> parentForward, Map<String, List<String>> parentBackward, String startId, String endId, String meetingNode) {
         List<String> path = new ArrayList<>();
 
-        // Build start -> meeting by walking parents from the meeting to start
+        // Build start -> meeting
         String current = meetingNode;
         while (current != null && !current.equals(startId)) {
-            path.add(0, current); // Add to beginning
+            path.add(0, current);
             List<String> parents = parentForward.get(current);
             current = (parents != null && !parents.isEmpty()) ? parents.get(0) : null;
         }
-        if (current != null) path.add(0, current); // Add start node
+        if (current != null) path.add(0, current);
 
-        // Then append meeting -> end by following backward parents from the node after meeting
+        // Build meeting -> end
         current = meetingNode;
         List<String> backwardParents = parentBackward.get(current);
         if (backwardParents != null && !backwardParents.isEmpty()) {
@@ -291,17 +570,15 @@ public class Graph implements Serializable {
                 List<String> parents = parentBackward.get(current);
                 current = (parents != null && !parents.isEmpty()) ? parents.get(0) : null;
             }
-            if (current != null) path.add(current); // Add end node
+            if (current != null) path.add(current);
         }
 
-        return formatPathFromNodeList(path, startId, endId);
+        return formatPath(path, startId, endId);
     }
 
 
-    private String formatPathFromNodeList(List<String> path, String startId, String endId) {
+    private String formatPath(List<String> path, String startId, String endId) {
         StringBuilder sb = new StringBuilder();
-        
-        // Extract celebrity IDs and title IDs
         List<String> celebrityIds = new ArrayList<>();
         List<String> titleIds = new ArrayList<>();
         List<String> titleNames = new ArrayList<>();
@@ -312,25 +589,21 @@ public class Graph implements Serializable {
             
             if (i < path.size() - 1) {
                 String nextNodeId = path.get(i + 1);
-                String commonTitleId = findCommonTitleIdBetweenCelebrities(nodeId, nextNodeId);
-                String commonTitleName = findCommonTitleNameBetweenCelebrities(nodeId, nextNodeId);
-                titleIds.add(commonTitleId != null ? commonTitleId : "unknown");
-                titleNames.add(commonTitleName != null ? commonTitleName : "Unknown Title");
+                titleIds.add(findCommonTitleIdBetweenCelebrities(nodeId, nextNodeId));
+                titleNames.add(findCommonTitleNameBetweenCelebrities(nodeId, nextNodeId));
             }
         }
         
-        // Format the path for display (this should be the first non-metadata line)
+        // Format path display
         for (int i = 0; i < path.size(); i++) {
             if (i > 0) sb.append(" -> ");
             sb.append(formatCelebrity(path.get(i)));
         }
         sb.append("\n");
         
-        // Explicit endpoints for frontend normalization
+        // Add metadata
         sb.append("START_ID:").append(startId).append("\n");
         sb.append("END_ID:").append(endId).append("\n");
-        
-        // API format uses legacy naming for backward compatibility
         sb.append("ACTOR_IDS:").append(String.join(",", celebrityIds)).append("\n");
         sb.append("MOVIE_IDS:").append(String.join(",", titleIds)).append("\n");
         sb.append("MOVIE_TITLES:").append(String.join(",", titleNames)).append("\n");
@@ -339,25 +612,58 @@ public class Graph implements Serializable {
     }
     
     private String findCommonTitleNameBetweenCelebrities(String a, String b) {
-        Set<String> ta = celebrityTitles.getOrDefault(a, Set.of());
-        Set<String> tb = celebrityTitles.getOrDefault(b, Set.of());
-        for (String t : ta) if (tb.contains(t)) return titleNames.getOrDefault(t, "Unknown Title");
+        String commonTitleId = findCommonTitleIdBetweenCelebrities(a, b);
+        if (commonTitleId == null || commonTitleId.equals("unknown")) {
+            return "Unknown Title";
+        }
+        
+        // Find title index by ID using O(1) lookup
+        Integer titleIndex = (titleIdToIndex != null) ? titleIdToIndex.get(commonTitleId) : null;
+        if (titleIndex != null && titleIndex >= 0 && titleIndex < titleNames.length) {
+            return titleNames[titleIndex] != null ? titleNames[titleIndex] : commonTitleId;
+        }
+        
+        // Fallback to linear search if maps not built yet
+        for (int i = 0; i < titleIds.length; i++) {
+            if (titleIds[i] != null && titleIds[i].equals(commonTitleId)) {
+                return titleNames[i] != null ? titleNames[i] : commonTitleId;
+            }
+        }
         return "Unknown Title";
     }
     
     private String findCommonTitleIdBetweenCelebrities(String a, String b) {
-        Set<String> ta = celebrityTitles.getOrDefault(a, Set.of());
-        Set<String> tb = celebrityTitles.getOrDefault(b, Set.of());
-        for (String t : ta) if (tb.contains(t)) return t;
+        int celebrityAIndex = findCelebrityIndex(a);
+        int celebrityBIndex = findCelebrityIndex(b);
+        
+        if (celebrityAIndex == -1 || celebrityBIndex == -1) {
+            return "unknown";
+        }
+        
+        // Find common title by checking which titles both celebrities appear in
+        for (int titleIndex = 0; titleIndex < titleCelebrities.length; titleIndex++) {
+            int[] celebritiesInTitle = titleCelebrities[titleIndex];
+            if (celebritiesInTitle == null) continue;
+            
+            boolean hasA = false, hasB = false;
+            for (int celebrityIndex : celebritiesInTitle) {
+                if (celebrityIndex == celebrityAIndex) hasA = true;
+                if (celebrityIndex == celebrityBIndex) hasB = true;
+                if (hasA && hasB) {
+                    return titleIds[titleIndex];
+                }
+            }
+        }
+        
         return "unknown";
     }
 
     private String formatCelebrity(String celebrityId) {
-        return celebrityNames.getOrDefault(celebrityId, "Unknown");
-    }
-
-    public Map<String, String> getActorNames() {
-        return new HashMap<>(celebrityNames);
+        int index = findCelebrityIndex(celebrityId);
+        if (index != -1 && index < celebrityNames.length) {
+            return celebrityNames[index];
+        }
+        return "Unknown";
     }
     
     private List<String> parseCSVLine(String line) {
@@ -385,5 +691,18 @@ public class Graph implements Serializable {
         
         result.add(current.toString());
         return result;
+    }
+    
+    private void initializeEmptyGraph() {
+        System.out.println("Initializing empty graph structures...");
+        celebrityNames = new String[0];
+        celebrityIds = new String[0];
+        titleNames = new String[0];
+        titleIds = new String[0];
+        adjacencyList = new int[0][];
+        celebrityCount = new int[0];
+        titleCelebrities = new int[0][];
+        titleCelebrityCount = new int[0];
+        System.out.println("Empty graph initialized - ready to load from cache");
     }
 }

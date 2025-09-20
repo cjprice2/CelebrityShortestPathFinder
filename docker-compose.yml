@@ -1,43 +1,32 @@
 services:
   backend:
-    profiles: ["dev", "prod"]
     build:
       context: ./backend
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
     volumes:
-      - ./backend/src/main/resources:/app/backend/src/main/resources:ro
-      - graph-cache:/data
+      - ./backend/src/main/resources:/app/src/main/resources:ro
     environment:
-      - JAVA_OPTS=-Xmx12g -Xms4g
+      - JAVA_OPTS=-Xmx3000m -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/heap.hprof
       - TMDB_API_KEY=${TMDB_API_KEY}
-      - GRAPH_RESOURCE_DIR=/app/backend/src/main/resources
-      - GRAPH_CACHE_FILE=/data/graph-cache.bin
+      - GRAPH_RESOURCE_DIR=/app/src/main/resources
+      - GRAPH_CACHE_FILE=/app/graph-cache.bin.gz
     restart: "no"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
 
-  # Production frontend (built image)
   frontend:
-    profiles: ["prod"]
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    environment:
-      NEXT_PUBLIC_API_URL: http://backend:8080
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-      
-  # Development frontend (built image with hot reload)
-  frontend-dev:
-    profiles: ["dev"]
     build:
       context: ./frontend
       dockerfile: Dockerfile
       target: deps
     environment:
-      NEXT_PUBLIC_API_URL: http://backend:8080
+      NEXT_PUBLIC_API_URL: http://localhost:8080
       PORT: 3000
     volumes:
       - ./frontend:/app
@@ -47,6 +36,3 @@ services:
       - "3000:3000"
     depends_on:
       - backend
-
-volumes:
-  graph-cache: {}

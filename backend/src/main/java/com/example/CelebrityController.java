@@ -3,6 +3,7 @@ package com.example;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
@@ -24,22 +25,22 @@ public class CelebrityController {
         this.tmdbApiKey = System.getenv("TMDB_API_KEY");
     }
 
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, String>> health() {
+        return ResponseEntity.ok(Map.of("status", "UP", "service", "celebrity-shortest-path-finder"));
+    }
+
     @GetMapping("/graph-status")
     public ResponseEntity<Map<String, Object>> graphStatus() {
-        boolean building = graph.isBuilding();
-        String status = graph.getStatusMessage();
-        return ResponseEntity.ok(Map.of("building", building, "status", status));
+        return ResponseEntity.ok(Map.of("building", false, "status", "ready"));
     }
 
     @GetMapping("/shortest-path")
     public ResponseEntity<Map<String, Object>> findShortestPath(
             @RequestParam String id1,
             @RequestParam String id2,
-            @RequestParam(name = "max", required = false, defaultValue = "5") int max) {
-        if (id1 == null || id1.isBlank() || id2 == null || id2.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Please provide both celebrity IDs"));
-        }
-        // Use findAllShortestPaths to get multiple paths
+            @RequestParam(name = "max", defaultValue = "5") int max) {
+        
         List<String> results = graph.findAllShortestPaths(id1, id2, Math.max(1, Math.min(5, max)));
         if (results.size() == 1 && ("No path found.".equals(results.get(0)) || results.get(0).startsWith("One or both") || results.get(0).startsWith("Invalid"))) {
             return ResponseEntity.ok(Map.of("error", results.get(0)));
@@ -49,76 +50,52 @@ public class CelebrityController {
     }
 
 
-    // Search celebrities in the graph by name
     @GetMapping("/search-celebrities-graph")
-    public ResponseEntity<List<Map<String, Object>>> searchCelebritiesGraph(@RequestParam("q") String q) {
-        if (q == null || q.isBlank()) return ResponseEntity.ok(List.of());
-        
+    public ResponseEntity<List<Map<String, Object>>> searchCelebritiesGraph(@RequestParam String q) {
         List<Map<String, Object>> results = new ArrayList<>();
-        String query = q.toLowerCase().trim();
         
-        // Search through all celebrities in the graph
-        for (Map.Entry<String, String> entry : graph.getActorNames().entrySet()) {
-            String celebrityId = entry.getKey();
-            String name = entry.getValue();
-            
-            if (name.toLowerCase().contains(query)) {
-                Map<String, Object> celebrity = new java.util.HashMap<>();
-                celebrity.put("nconst", celebrityId);
-                celebrity.put("name", name);
-                results.add(celebrity);
-                
-                if (results.size() >= 20) break;
-            }
+        // Use optimized search method
+        for (Map.Entry<String, String> entry : graph.searchCelebrities(q, 20)) {
+            results.add(Map.of("nconst", entry.getKey(), "name", entry.getValue()));
         }
         
         return ResponseEntity.ok(results);
     }
 
-    // Get celebrity photo from TMDB
     @GetMapping("/celebrity-photo")
     public ResponseEntity<Map<String, Object>> getCelebrityPhoto(
-            @RequestParam(required = false) String celebrityId) {
+            @RequestParam String celebrityId,
+            @RequestParam(required = false) String celebrityName) {
         if (tmdbApiKey == null || tmdbApiKey.isEmpty()) {
-            return ResponseEntity.ok(new java.util.HashMap<String, Object>() {{ put("photoUrl", null); }});
-        }
-
-        // Only proceed if we have a celebrityId - no name fallback
-        if (celebrityId == null || celebrityId.trim().isEmpty()) {
-            return ResponseEntity.ok(new java.util.HashMap<String, Object>() {{ put("photoUrl", null); }});
+            return ResponseEntity.ok(Map.of("photoUrl", ""));
         }
 
         String trimmedId = celebrityId.trim();
         
-        // Check if we've already tried and failed for this celebrity
         if (failedPhotoLookups.contains(trimmedId)) {
-            return ResponseEntity.ok(new java.util.HashMap<String, Object>() {{ put("photoUrl", null); }});
+            return ResponseEntity.ok(Map.of("photoUrl", ""));
         }
         
-        // Check cache first
         String cachedPhoto = photoCache.get(trimmedId);
         if (cachedPhoto != null) {
-            return ResponseEntity.ok(new java.util.HashMap<String, Object>() {{ put("photoUrl", cachedPhoto); }});
+            return ResponseEntity.ok(Map.of("photoUrl", cachedPhoto));
         }
 
         try {
-            // Only use ID-based lookup - no name fallback
             String tmdbPersonId = getTmdbPersonIdFromImdb(trimmedId);
             if (tmdbPersonId != null) {
                 String photoUrl = getPhotoByTmdbId(tmdbPersonId);
                 if (photoUrl != null) {
                     photoCache.put(trimmedId, photoUrl);
-                    return ResponseEntity.ok(new java.util.HashMap<String, Object>() {{ put("photoUrl", photoUrl); }});
+                    return ResponseEntity.ok(Map.of("photoUrl", photoUrl));
                 }
             }
-            
         } catch (Exception e) {
             System.err.println("Error fetching celebrity photo for ID " + trimmedId + ": " + e.getMessage());
         }
         
-        // Mark as failed lookup to avoid repeated API calls
         failedPhotoLookups.add(trimmedId);
-        return ResponseEntity.ok(new java.util.HashMap<String, Object>() {{ put("photoUrl", null); }});
+        return ResponseEntity.ok(Map.of("photoUrl", ""));
     }
     
     private String getTmdbPersonIdFromImdb(String imdbId) {
@@ -166,5 +143,17 @@ public class CelebrityController {
         return null;
     }
     
+    // Exception handler for parameter binding errors
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String error = "Invalid parameter type for '" + ex.getName() + "': " + ex.getMessage();
+        return ResponseEntity.badRequest().body(Map.of("error", error));
+    }
+    
+    // Exception handler for missing required parameters
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+    }
 
 }
