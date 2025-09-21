@@ -33,8 +33,8 @@ export default function SearchForm({ onSearch }) {
       // Set suggestions immediately without photos for faster UI
       setSuggestions(suggestions);
       
-      // Fetch photos in background (non-blocking) - only if we have an ID
-      suggestions.forEach(async (item) => {
+      // Fetch photos in background (non-blocking) - limit to top 6 for overlay filesystem
+      suggestions.slice(0, 6).forEach(async (item) => {
         if (!item.nconst) return; // Skip if no ID
         
         try {
@@ -62,8 +62,8 @@ export default function SearchForm({ onSearch }) {
     
     if (value.length > 0) {
       abortController1.current = new AbortController();
-      // Debounce to reduce server load
-      searchTimeout1.current = setTimeout(() => searchCelebrities(value, setSuggestions1, abortController1.current), 250);
+      // Debounce to balance responsiveness and load (120ms for overlay filesystem)
+      searchTimeout1.current = setTimeout(() => searchCelebrities(value, setSuggestions1, abortController1.current), 120);
       setShowSuggestions1(true);
     } else {
       setSuggestions1([]);
@@ -79,8 +79,8 @@ export default function SearchForm({ onSearch }) {
     
     if (value.length > 0) {
       abortController2.current = new AbortController();
-      // Debounce to reduce server load
-      searchTimeout2.current = setTimeout(() => searchCelebrities(value, setSuggestions2, abortController2.current), 250);
+      // Debounce to balance responsiveness and load (120ms for overlay filesystem)
+      searchTimeout2.current = setTimeout(() => searchCelebrities(value, setSuggestions2, abortController2.current), 120);
       setShowSuggestions2(true);
     } else {
       setSuggestions2([]);

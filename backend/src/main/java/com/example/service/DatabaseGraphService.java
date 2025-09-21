@@ -7,6 +7,9 @@ import com.example.repository.TitleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import java.util.concurrent.TimeUnit;
 
 import java.util.*;
 
@@ -22,6 +25,12 @@ public class DatabaseGraphService {
     
     @Autowired
     private CelebrityTitleRepository celebrityTitleRepository;
+    
+    // Small cache for search results (60s TTL, max 1000 entries)
+    private final Cache<String, List<Celebrity>> searchCache = Caffeine.newBuilder()
+            .maximumSize(1000)
+            .expireAfterWrite(60, TimeUnit.SECONDS)
+            .build();
     
     @Autowired
     private TitleRepository titleRepository;
@@ -329,12 +338,27 @@ public class DatabaseGraphService {
     
     @Transactional(readOnly = true)
     public List<Celebrity> searchCelebrities(String query) {
+        // Check cache first
+        String cacheKey = query.toLowerCase().trim();
+        List<Celebrity> cached = searchCache.getIfPresent(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+        
         // Prefer prefix search for speed, fall back to contains
-        List<Celebrity> byName = celebrityRepository.searchByNamePrefix(query);
-        if (!byName.isEmpty()) return byName;
+        List<Celebrity> byName = celebrityRepository.searchByNamePrefix(query + "%");
+        if (!byName.isEmpty()) {
+            searchCache.put(cacheKey, byName);
+            return byName;
+        }
         byName = celebrityRepository.findTop10ByNameContainingIgnoreCase(query);
-        if (!byName.isEmpty()) return byName;
+        if (!byName.isEmpty()) {
+            searchCache.put(cacheKey, byName);
+            return byName;
+        }
         // If no name matches, try ID contains (supports 'nm' prefix searches)
-        return celebrityRepository.findTop10ByIdContainingIgnoreCase(query);
+        List<Celebrity> result = celebrityRepository.findTop10ByIdContainingIgnoreCase(query);
+        searchCache.put(cacheKey, result);
+        return result;
     }
 }
