@@ -43,7 +43,7 @@ export default function PathResult({ result }) {
   const fetchCelebrityPhoto = useCallback(async (celebrityName, celebrityId, signal) => {
     if (celebrityPhotos[celebrityName] || !celebrityId) return;
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/$/, '');
       const url = `${apiUrl}/api/celebrity-photo?celebrityId=${encodeURIComponent(celebrityId)}&celebrityName=${encodeURIComponent(celebrityName)}`;
       const response = await fetch(url, { signal });
       if (!response.ok) return;

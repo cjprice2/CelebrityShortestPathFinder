@@ -22,7 +22,7 @@ export default function SearchForm({ onSearch }) {
     if (!q || q.trim().length === 0) { setSuggestions([]); return; }
     try {
       // Use graph-based search for exact nconst matches
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/$/, '');
       const res = await fetch(`${apiUrl}/api/search-celebrities-graph?q=${encodeURIComponent(q)}`, {
         signal: abortController.signal
       });

@@ -29,7 +29,7 @@ export default function HomePage() {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 60000); // fail after 60s
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/$/, '');
       console.log('API URL:', apiUrl);
       const res = await fetch(`${apiUrl}/api/shortest-path?id1=${encodeURIComponent(celebrity1)}&id2=${encodeURIComponent(celebrity2)}&max=5`, { signal: controller.signal });
       clearTimeout(timeout);
