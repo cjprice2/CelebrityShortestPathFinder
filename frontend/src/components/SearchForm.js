@@ -133,32 +133,10 @@ export default function SearchForm({ onSearch }) {
     <form
       onSubmit={async e => {
         e.preventDefault();
-        const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/$/, '');
-        let id1 = selectedId1;
-        let id2 = selectedId2;
-        
-        // If no ID selected, try to find by name in graph
-        if (!id1 && name1.trim()) {
-          try {
-            const r = await fetch(`${apiUrl}/api/search-celebrities-graph?q=${encodeURIComponent(name1.trim())}`);
-            const d = await r.json();
-            if (Array.isArray(d) && d.length > 0) {
-              id1 = d[0].nconst;
-            }
-          } catch {}
-        }
-        if (!id2 && name2.trim()) {
-          try {
-            const r = await fetch(`${apiUrl}/api/search-celebrities-graph?q=${encodeURIComponent(name2.trim())}`);
-            const d = await r.json();
-            if (Array.isArray(d) && d.length > 0) {
-              id2 = d[0].nconst;
-            }
-          } catch {}
-        }
-        
-        if (!id1 || !id2) return;
-        onSearch(id1, id2);
+        const v1 = (selectedId1 || name1.trim());
+        const v2 = (selectedId2 || name2.trim());
+        if (!v1 || !v2) return;
+        onSearch(v1, v2);
       }}
       className="flex flex-col gap-4 items-center w-full max-w-lg"
       autoComplete="off"

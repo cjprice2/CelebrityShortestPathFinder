@@ -13,7 +13,8 @@ export default function RootLayout({ children }) {
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-        <meta name="theme-color" content="#1f2937" />
+        {/* Match header/footer bg (gray-900) for iOS safe areas/status bar */}
+        <meta name="theme-color" content="#101828" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

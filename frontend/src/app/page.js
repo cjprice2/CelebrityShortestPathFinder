@@ -12,30 +12,72 @@ export default function HomePage() {
   const [cache, setCache] = useState(new Map());
   const [loadingMsg, setLoadingMsg] = useState("Finding shortest path");
 
-  const handleSearch = async (celebrity1, celebrity2) => {
-    const cacheKey = [celebrity1, celebrity2].sort().join('|');
-    
-    // Check cache first
-    if (cache.has(cacheKey)) {
-      setResults(cache.get(cacheKey));
-      setError("");
-      return;
+  const resolveNameToId = async (value, signal) => {
+    const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/$/, '');
+    try {
+      const res = await fetch(`${apiUrl}/api/search-celebrities-graph?q=${encodeURIComponent(value)}`, { signal });
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        return data[0].nconst;
+      }
+    } catch (e) {
+      // ignore
     }
-    
+    return "";
+  };
+
+  const isLikelyId = (v) => /^nm\d{1,9}$/.test(v);
+
+  const handleSearch = async (input1, input2) => {
+    // Begin loading immediately
     setLoading(true);
     setError("");
     setResults([]);
     setLoadingMsg("Finding shortest path");
+
+    const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/$/, '');
+
+    // Resolve inputs to IDs concurrently if needed
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000); // cap name->ID at 8s
+
+    const p1 = isLikelyId(input1) ? Promise.resolve(input1) : resolveNameToId(input1, controller.signal);
+    const p2 = isLikelyId(input2) ? Promise.resolve(input2) : resolveNameToId(input2, controller.signal);
+
+    let id1 = "";
+    let id2 = "";
+
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 60000); // fail after 60s
-      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/$/, '');
-      console.log('API URL:', apiUrl);
-      const res = await fetch(`${apiUrl}/api/shortest-path?id1=${encodeURIComponent(celebrity1)}&id2=${encodeURIComponent(celebrity2)}&max=5`, { signal: controller.signal });
+      [id1, id2] = await Promise.all([p1, p2]);
+    } catch (e) {
+      // if aborted or failed, fall through with empty ids
+    } finally {
       clearTimeout(timeout);
+    }
+
+    if (!id1 || !id2) {
+      setLoading(false);
+      setError("One or both celebrities not found. Please refine names or pick from suggestions.");
+      return;
+    }
+
+    const cacheKey = [id1, id2].sort().join('|');
+
+    // Check cache
+    if (cache.has(cacheKey)) {
+      setResults(cache.get(cacheKey));
+      setError("");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const pathController = new AbortController();
+      const pathTimeout = setTimeout(() => pathController.abort(), 60000); // fail after 60s
+      const res = await fetch(`${apiUrl}/api/shortest-path?id1=${encodeURIComponent(id1)}&id2=${encodeURIComponent(id2)}&max=5`, { signal: pathController.signal });
+      clearTimeout(pathTimeout);
 
       if (!res.ok) {
-        // Handle different error cases with user-friendly messages
         if (res.status === 500) {
           throw new Error("No paths found, try a different pair of celebrities");
         } else if (res.status === 404) {
@@ -50,7 +92,6 @@ export default function HomePage() {
         setError(data.error);
       } else {
         const arr = Array.isArray(data.results) ? data.results.slice(0,5) : [];
-        // Cache the successful results array
         setCache(prev => new Map(prev).set(cacheKey, arr));
         setResults(arr);
       }
