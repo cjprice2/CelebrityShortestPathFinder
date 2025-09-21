@@ -5,7 +5,7 @@ services:
 - name: backend
   source_dir: /backend
   github:
-    repo: your-github-username/CelebrityShortestPathFinder
+    repo: cjprice2/CelebrityShortestPathFinder
     branch: main
     deploy_on_push: true
   run_command: java -Xmx1g -Xms256m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -Dserver.address=0.0.0.0 -Dserver.port=$PORT -jar /app/target/*.jar
