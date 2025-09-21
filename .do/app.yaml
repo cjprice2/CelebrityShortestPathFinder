@@ -1,0 +1,68 @@
+name: celebrity-shortest-path-finder
+region: nyc
+
+services:
+- name: backend
+  source_dir: /backend
+  github:
+    repo: your-github-username/CelebrityShortestPathFinder
+    branch: main
+    deploy_on_push: true
+  run_command: java -Xmx1g -Xms256m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -Dserver.address=0.0.0.0 -Dserver.port=$PORT -jar /app/target/*.jar
+  environment_slug: java
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  http_port: 8080
+  envs:
+  - key: TMDB_API_KEY
+    scope: RUN_TIME
+    type: SECRET
+  - key: GRAPH_RESOURCE_DIR
+    scope: RUN_TIME
+    value: "/app/src/main/resources"
+  - key: SPRING_PROFILES_ACTIVE
+    scope: RUN_TIME
+    value: "database"
+  - key: SPRING_DATASOURCE_URL
+    scope: RUN_TIME
+    value: "jdbc:sqlite:/app/data/celebrity_graph.db"
+  - key: BFS_MAX_VISITED
+    scope: RUN_TIME
+    value: "3000000"
+  - key: BFS_MAX_QUEUE
+    scope: RUN_TIME
+    value: "1000000"
+  - key: SKIP_DATA_LOADING
+    scope: RUN_TIME
+    value: "false"
+  - key: SKIP_INDEX_ENSURE
+    scope: RUN_TIME
+    value: "false"
+
+- name: frontend
+  source_dir: /frontend
+  github:
+    repo: your-github-username/CelebrityShortestPathFinder
+    branch: main
+    deploy_on_push: true
+  run_command: npm start
+  environment_slug: node-js
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  http_port: 3000
+  routes:
+  - path: /
+  envs:
+  - key: NEXT_PUBLIC_API_URL
+    scope: RUN_AND_BUILD_TIME
+    value: "${backend.PUBLIC_URL}"
+  - key: PORT
+    scope: RUN_TIME
+    value: "3000"
+
+databases:
+- engine: PG
+  name: celebrity-db
+  num_nodes: 1
+  size: db-s-dev-database
+  version: "12"
