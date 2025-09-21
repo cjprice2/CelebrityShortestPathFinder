@@ -65,10 +65,14 @@ public class CelebrityController {
 
     @GetMapping("/search-celebrities-graph")
     public ResponseEntity<List<Map<String, Object>>> searchCelebritiesGraph(@RequestParam String q) {
+        String trimmed = q == null ? "" : q.trim();
+        if (trimmed.length() < 2) {
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
         List<Map<String, Object>> results = new ArrayList<>();
         
         // Use database search method
-        List<Celebrity> celebrities = databaseGraphService.searchCelebrities(q);
+        List<Celebrity> celebrities = databaseGraphService.searchCelebrities(trimmed);
         for (Celebrity celebrity : celebrities) {
             results.add(Map.of("nconst", celebrity.getId(), "name", celebrity.getName()));
         }

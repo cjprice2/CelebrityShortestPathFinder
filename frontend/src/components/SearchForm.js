@@ -20,7 +20,7 @@ export default function SearchForm({ onSearch }) {
 
   // Search celebrities in the graph for suggestions
   const searchCelebrities = async (q, setSuggestions, abortController) => {
-    if (!q || q.trim().length === 0) { setSuggestions([]); return; }
+    if (!q || q.trim().length < 2) { setSuggestions([]); return; }
     try {
       // Use graph-based search for exact nconst matches
       const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/$/, '');
@@ -62,7 +62,8 @@ export default function SearchForm({ onSearch }) {
     
     if (value.length > 0) {
       abortController1.current = new AbortController();
-      searchTimeout1.current = setTimeout(() => searchCelebrities(value, setSuggestions1, abortController1.current), 50);
+      // Debounce to reduce server load
+      searchTimeout1.current = setTimeout(() => searchCelebrities(value, setSuggestions1, abortController1.current), 250);
       setShowSuggestions1(true);
     } else {
       setSuggestions1([]);
@@ -78,7 +79,8 @@ export default function SearchForm({ onSearch }) {
     
     if (value.length > 0) {
       abortController2.current = new AbortController();
-      searchTimeout2.current = setTimeout(() => searchCelebrities(value, setSuggestions2, abortController2.current), 50);
+      // Debounce to reduce server load
+      searchTimeout2.current = setTimeout(() => searchCelebrities(value, setSuggestions2, abortController2.current), 250);
       setShowSuggestions2(true);
     } else {
       setSuggestions2([]);

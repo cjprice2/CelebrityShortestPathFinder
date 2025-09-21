@@ -8,11 +8,6 @@ import org.springframework.web.client.RestTemplate;
 import com.example.service.DataLoadingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Primary;
-import javax.sql.DataSource;
-import org.springframework.boot.jdbc.DataSourceBuilder;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 
@@ -62,16 +57,6 @@ public class CelebrityShortestPathFinderApplication implements CommandLineRunner
         @Bean
         public RestTemplate restTemplate() {
             return new RestTemplate();
-        }
-        
-        @Bean
-        @Primary
-        @ConditionalOnProperty(name = "spring.profiles.active", havingValue = "database")
-        public DataSource dataSource(@Value("${spring.datasource.url}") String url) {
-            return DataSourceBuilder.create()
-                    .driverClassName("org.sqlite.JDBC")
-                    .url(url)
-                    .build();
         }
     }
 } 

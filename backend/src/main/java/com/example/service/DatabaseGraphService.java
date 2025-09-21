@@ -6,6 +6,7 @@ import com.example.repository.CelebrityTitleRepository;
 import com.example.repository.TitleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 
@@ -326,6 +327,7 @@ public class DatabaseGraphService {
     }
     
     
+    @Transactional(readOnly = true)
     public List<Celebrity> searchCelebrities(String query) {
         // Prefer prefix search for speed, fall back to contains
         List<Celebrity> byName = celebrityRepository.searchByNamePrefix(query);
