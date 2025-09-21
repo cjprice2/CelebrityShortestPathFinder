@@ -45,7 +45,9 @@ backend/src/main/resources/name.basics.tsv.gz
 backend/src/main/resources/title.basics.tsv.gz
 backend/src/main/resources/title.principals.tsv.gz
 backend/graph-cache.bin
+backend/graph-cache.bin.gz
 backend/src/main/resources/process_imdb_data.py
+celebrity_graph.db
 
 # Maven build output
 backend/target/

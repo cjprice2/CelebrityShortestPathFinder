@@ -4,6 +4,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.example.service.DatabaseGraphService;
+import com.example.entity.Celebrity;
 import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
@@ -13,14 +16,15 @@ import java.util.ArrayList;
 @CrossOrigin(origins = "*")
 public class CelebrityController {
 
-    private final Graph graph;
+    @Autowired
+    private DatabaseGraphService databaseGraphService;
+    
     private final RestTemplate restTemplate;
     private final String tmdbApiKey;
     private final Map<String, String> photoCache = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Set<String> failedPhotoLookups = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-    public CelebrityController(Graph graph, RestTemplate restTemplate) {
-        this.graph = graph;
+    public CelebrityController(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
         this.tmdbApiKey = System.getenv("TMDB_API_KEY");
     }
@@ -34,6 +38,15 @@ public class CelebrityController {
     public ResponseEntity<Map<String, Object>> graphStatus() {
         return ResponseEntity.ok(Map.of("building", false, "status", "ready"));
     }
+    
+    @GetMapping("/database-stats")
+    public ResponseEntity<Map<String, Object>> getDatabaseStats() {
+        // This would need to be implemented in DatabaseGraphService
+        return ResponseEntity.ok(Map.of(
+            "message", "Database stats endpoint - implement in DatabaseGraphService",
+            "database_type", "SQLite"
+        ));
+    }
 
     @GetMapping("/shortest-path")
     public ResponseEntity<Map<String, Object>> findShortestPath(
@@ -41,9 +54,9 @@ public class CelebrityController {
             @RequestParam String id2,
             @RequestParam(name = "max", defaultValue = "5") int max) {
         
-        List<String> results = graph.findAllShortestPaths(id1, id2, Math.max(1, Math.min(5, max)));
-        if (results.size() == 1 && ("No path found.".equals(results.get(0)) || results.get(0).startsWith("One or both") || results.get(0).startsWith("Invalid"))) {
-            return ResponseEntity.ok(Map.of("error", results.get(0)));
+        List<String> results = databaseGraphService.findShortestPath(id1, id2);
+        if (results.isEmpty()) {
+            return ResponseEntity.ok(Map.of("error", "No path found."));
         }
         
         return ResponseEntity.ok(Map.of("results", results));
@@ -54,9 +67,10 @@ public class CelebrityController {
     public ResponseEntity<List<Map<String, Object>>> searchCelebritiesGraph(@RequestParam String q) {
         List<Map<String, Object>> results = new ArrayList<>();
         
-        // Use optimized search method
-        for (Map.Entry<String, String> entry : graph.searchCelebrities(q, 20)) {
-            results.add(Map.of("nconst", entry.getKey(), "name", entry.getValue()));
+        // Use database search method
+        List<Celebrity> celebrities = databaseGraphService.searchCelebrities(q);
+        for (Celebrity celebrity : celebrities) {
+            results.add(Map.of("nconst", celebrity.getId(), "name", celebrity.getName()));
         }
         
         return ResponseEntity.ok(results);

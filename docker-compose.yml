@@ -1,24 +1,30 @@
 services:
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "8080:8080"
     volumes:
+      - sqlite_data:/app/data
       - ./backend/src/main/resources:/app/src/main/resources:ro
     environment:
-      - JAVA_OPTS=-Xmx3000m -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/heap.hprof
+      - JAVA_OPTS=-Xmx2g -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -XX:+UseCompressedOops -XX:+UseCompressedClassPointers -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/heap.hprof
       - TMDB_API_KEY=${TMDB_API_KEY}
       - GRAPH_RESOURCE_DIR=/app/src/main/resources
-      - GRAPH_CACHE_FILE=/app/graph-cache.bin.gz
-    restart: "no"
+      - SPRING_PROFILES_ACTIVE=database
+      - SPRING_DATASOURCE_URL=jdbc:sqlite:/app/data/celebrity_graph.db
+      - BFS_MAX_VISITED=3000000
+      - BFS_MAX_QUEUE=1000000
+      - SKIP_DATA_LOADING=false
+      - SKIP_INDEX_ENSURE=false
+    restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 4G
+          memory: 9G
         reservations:
-          memory: 1G
+          memory: 2G
 
   frontend:
     build:
@@ -36,3 +42,6 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+volumes:
+  sqlite_data:
+

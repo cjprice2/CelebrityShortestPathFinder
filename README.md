@@ -79,7 +79,7 @@ Notes:
 
 ### Deploy Backend (choose one)
 
-- Render/Railway/Heroku: Deploy the `backend/` as a Java 21 Spring Boot app.
+- Render/Heroku: Deploy the `backend/` as a Java 21 Spring Boot app.
   - Set env vars:
     - `TMDB_API_KEY` (required)
     - `GRAPH_CACHE_FILE` (optional, default `/tmp/graph-cache.bin`)
