@@ -3,11 +3,11 @@ FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
 
 # Leverage dependency layer caching
-COPY backend/pom.xml ./
+COPY pom.xml ./
 RUN --mount=type=cache,id=s/73616753-6fb3-4cd8-b40c-5be58e266018-/root/.m2,target=/root/.m2 mvn -q -DskipTests dependency:go-offline
 
 # Copy sources (excluding large data files via .dockerignore)
-COPY backend/src ./src
+COPY src ./src
 
 # Copy the compressed database for production builds only (controlled by build arg)
 ARG INCLUDE_DATABASE=false
