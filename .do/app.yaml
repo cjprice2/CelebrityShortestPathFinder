@@ -6,7 +6,7 @@ services:
   github:
     repo: cjprice2/CelebrityShortestPathFinder
     branch: main
-    deploy_on_push: true
+    deploy_on_push: false
   build_command: mvn clean package -DskipTests
   run_command: java -Xmx1g -Xms256m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -Dserver.address=0.0.0.0 -Dserver.port=$PORT -jar target/*.jar
   environment_slug: java
