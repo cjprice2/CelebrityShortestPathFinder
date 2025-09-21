@@ -23,6 +23,9 @@ services:
   - key: SPRING_PROFILES_ACTIVE
     scope: RUN_TIME
     value: "database"
+  - key: SPRING_DATASOURCE_DRIVER_CLASS_NAME
+    scope: RUN_TIME
+    value: "com.mysql.cj.jdbc.Driver"
   - key: SPRING_DATASOURCE_URL
     scope: RUN_TIME
     value: "jdbc:mysql://db-mysql-nyc3-14508-do-user-26340291-0.k.db.ondigitalocean.com:25060/celebrity_graph?useSSL=true&serverTimezone=UTC&allowPublicKeyRetrieval=true"
@@ -50,3 +53,6 @@ services:
   - key: SKIP_DATA_LOADING
     scope: RUN_TIME
     value: "false"
+  - key: LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_BOOT_AUTOCONFIGURE
+    scope: RUN_TIME
+    value: "DEBUG"
