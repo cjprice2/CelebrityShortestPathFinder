@@ -1,10 +1,39 @@
+# Dependencies
 node_modules
-.next
-.git
-.gitignore
 npm-debug.log*
-*.log
-.env*
-coverage
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+.next
+out
 dist
 build
+coverage
+
+# Environment files
+.env*
+
+# Version control
+.git
+.gitignore
+
+# Logs
+*.log
+logs
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp
+
+

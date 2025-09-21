@@ -41,9 +41,6 @@ public class DataLoadingService {
     public void loadDataFromFilesIfNeeded() {
         try {
             if (Boolean.parseBoolean(System.getenv().getOrDefault("SKIP_DATA_LOADING", "false"))) {
-                if (!Boolean.parseBoolean(System.getenv().getOrDefault("SKIP_INDEX_ENSURE", "false"))) {
-                    ensureIndexes();
-                }
                 System.out.println("Data loading skipped via SKIP_DATA_LOADING=true");
                 return;
             }
@@ -54,27 +51,17 @@ public class DataLoadingService {
             // Check if data already exists
             long celebrityCount = celebrityRepository.count();
             if (celebrityCount > 0) {
-                if (!Boolean.parseBoolean(System.getenv().getOrDefault("SKIP_INDEX_ENSURE", "false"))) {
-                    // Ensure indexes exist even if data already loaded
-                    ensureIndexes();
-                }
-                System.out.println("Data already exists in database (" + celebrityCount + ") — ensured indexes. Skipping data loading.");
+                System.out.println("Data already exists in database (" + celebrityCount + " celebrities). Skipping data loading.");
                 return;
             }
             
             System.out.println("Database is empty. Starting data loading...");
-            createTablesIfNeeded();
-            if (!Boolean.parseBoolean(System.getenv().getOrDefault("SKIP_INDEX_ENSURE", "false"))) {
-                ensureIndexes();
-            }
+            createTablesIfNeeded(); // This already creates all necessary indexes
             loadDataFromFiles();
         } catch (Exception e) {
             // If count() fails (tables don't exist), create tables and proceed with data loading
             System.out.println("Tables not found. Creating tables and starting data loading...");
-            createTablesIfNeeded();
-            if (!Boolean.parseBoolean(System.getenv().getOrDefault("SKIP_INDEX_ENSURE", "false"))) {
-                ensureIndexes();
-            }
+            createTablesIfNeeded(); // This already creates all necessary indexes
             loadDataFromFiles();
         }
     }
@@ -83,15 +70,38 @@ public class DataLoadingService {
         try {
             String dbPath = System.getenv().getOrDefault("DB_PATH", "/app/data/celebrity_graph.db");
             String dbUrl = System.getenv().getOrDefault("DATABASE_DOWNLOAD_URL", 
-                "https://github.com/YOUR_USERNAME/CelebrityShortestPathFinder/releases/download/v1.0.0/celebrity_graph.db.gz");
+                "https://github.com/cjprice2/CelebrityShortestPathFinder/releases/download/v1.0.0/celebrity_graph.db.gz");
             
             java.io.File dbFile = new java.io.File(dbPath);
+            // Check if database exists and has data by trying to count celebrities
             if (dbFile.exists() && dbFile.length() > 0) {
-                System.out.println("Database file already exists at: " + dbPath);
+                try {
+                    long count = celebrityRepository.count();
+                    if (count > 0) {
+                        System.out.println("Pre-built database already exists with " + count + " celebrities at: " + dbPath);
+                        return;
+                    }
+                } catch (Exception e) {
+                    System.out.println("Existing database file appears corrupted, will re-extract/download: " + e.getMessage());
+                }
+            }
+            
+            // First, try to use baked-in .gz file in Docker, then check local development paths
+            java.io.File localGzFile = new java.io.File("/app/celebrity_graph.db.gz"); // Docker location (baked-in)
+            if (!localGzFile.exists()) {
+                localGzFile = new java.io.File("celebrity_graph.db.gz"); // Local development
+            }
+            if (!localGzFile.exists()) {
+                localGzFile = new java.io.File("../celebrity_graph.db.gz"); // Parent directory
+            }
+            if (localGzFile.exists()) {
+                System.out.println("Found celebrity_graph.db.gz at: " + localGzFile.getAbsolutePath() + ", extracting to: " + dbPath);
+                extractGzipFile(localGzFile, dbFile);
                 return;
             }
             
-            System.out.println("Downloading pre-built database from: " + dbUrl);
+            // If no local .gz file, download from URL
+            System.out.println("No celebrity_graph.db.gz found locally, downloading from: " + dbUrl);
             
             // Download compressed database
             java.net.URI uri = java.net.URI.create(dbUrl);
@@ -115,6 +125,28 @@ public class DataLoadingService {
         } catch (Exception e) {
             System.out.println("Failed to download database: " + e.getMessage());
             System.out.println("Will attempt to load from local files instead...");
+        }
+    }
+    
+    private void extractGzipFile(java.io.File gzFile, java.io.File outputFile) throws Exception {
+        System.out.println("Extracting " + gzFile.getName() + " (" + (gzFile.length() / 1024 / 1024) + "MB) to " + outputFile.getPath());
+        
+        try (java.io.FileInputStream fis = new java.io.FileInputStream(gzFile);
+             java.util.zip.GZIPInputStream gzipIn = new java.util.zip.GZIPInputStream(fis);
+             java.io.FileOutputStream out = new java.io.FileOutputStream(outputFile)) {
+            
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            long totalBytes = 0;
+            while ((bytesRead = gzipIn.read(buffer)) != -1) {
+                out.write(buffer, 0, bytesRead);
+                totalBytes += bytesRead;
+                if (totalBytes % (50 * 1024 * 1024) == 0) { // Log every 50MB
+                    System.out.println("Extracted: " + (totalBytes / 1024 / 1024) + "MB");
+                }
+            }
+            
+            System.out.println("Extraction completed: " + (totalBytes / 1024 / 1024) + "MB extracted to " + outputFile.getPath());
         }
     }
     
@@ -147,26 +179,6 @@ public class DataLoadingService {
         }
     }
 
-    private void ensureIndexes() {
-        try (
-            var conn = dataSource.getConnection();
-            var stmt = conn.createStatement()
-        ) {
-            boolean prevAuto = conn.getAutoCommit();
-            try {
-                conn.setAutoCommit(true);
-                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_celeb_name   ON celebrities(name)");
-                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_title_name   ON titles(name)");
-                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_ct_celebrity ON celebrity_titles(celebrity_id)");
-                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_ct_title     ON celebrity_titles(title_id)");
-                try { stmt.executeUpdate("ANALYZE"); } catch (Exception ignore) {}
-            } finally {
-                try { conn.setAutoCommit(prevAuto); } catch (Exception ignore) {}
-            }
-        } catch (Exception e) {
-            System.out.println("Error ensuring indexes: " + e.getMessage());
-        }
-    }
     
     public void loadDataFromFiles() {
         String resourceDir = System.getenv().getOrDefault("GRAPH_RESOURCE_DIR", "backend/src/main/resources");

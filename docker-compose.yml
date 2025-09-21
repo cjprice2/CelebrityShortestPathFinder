@@ -1,13 +1,10 @@
 services:
   backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
+    image: cjprice2/celebrity-backend:latest
     ports:
       - "8080:8080"
     volumes:
       - sqlite_data:/app/data
-      - ./backend/src/main/resources:/app/src/main/resources:ro
     environment:
       - JAVA_OPTS=-Xmx2g -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -XX:+UseCompressedOops -XX:+UseCompressedClassPointers -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/heap.hprof
       - TMDB_API_KEY=${TMDB_API_KEY}
@@ -18,7 +15,6 @@ services:
       - BFS_MAX_QUEUE=1000000
       - SKIP_DATA_LOADING=false
       - SKIP_INDEX_ENSURE=false
-      - DATABASE_DOWNLOAD_URL=https://github.com/YOUR_USERNAME/CelebrityShortestPathFinder/releases/download/v1.0.0/celebrity_graph.db.gz
     restart: unless-stopped
     deploy:
       resources:
@@ -28,17 +24,10 @@ services:
           memory: 2G
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: deps
+    image: cjprice2/celebrity-frontend:latest
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8080
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://backend:8080}
       PORT: 3000
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: sh -c "npm ci && npm run dev"
     ports:
       - "3000:3000"
     depends_on:
