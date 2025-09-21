@@ -20,7 +20,7 @@ public class CelebrityShortestPathFinderApplication implements CommandLineRunner
     public static void main(String[] args) {
         System.setProperty("server.address", "0.0.0.0");
         System.setProperty("server.port", "8080");
-        System.setProperty("spring.profiles.active", "mysql");
+        // Profile is set via environment variable SPRING_PROFILES_ACTIVE
         SpringApplication.run(CelebrityShortestPathFinderApplication.class, args);
     }
     
