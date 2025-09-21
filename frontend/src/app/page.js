@@ -75,9 +75,9 @@ export default function HomePage() {
   }, [loading]);
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-b from-gray-900 to-gray-800 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex flex-col">
       <Header />
-      <main className="flex flex-col items-center justify-start p-8 flex-grow">
+      <main className="flex flex-col items-center justify-start p-4 sm:p-8 flex-grow">
         <SearchForm onSearch={handleSearch} />
         {loading && (
           <div className="flex items-center gap-3 mt-6 text-blue-400">

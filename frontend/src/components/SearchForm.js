@@ -61,7 +61,7 @@ export default function SearchForm({ onSearch }) {
     
     if (value.length > 0) {
       abortController1.current = new AbortController();
-      searchTimeout1.current = setTimeout(() => searchCelebrities(value, setSuggestions1, abortController1.current), 50);
+      searchTimeout1.current = setTimeout(() => searchCelebrities(value, setSuggestions1, abortController1.current), 25);
       setShowSuggestions1(true);
     } else {
       setSuggestions1([]);
@@ -77,7 +77,7 @@ export default function SearchForm({ onSearch }) {
     
     if (value.length > 0) {
       abortController2.current = new AbortController();
-      searchTimeout2.current = setTimeout(() => searchCelebrities(value, setSuggestions2, abortController2.current), 50);
+      searchTimeout2.current = setTimeout(() => searchCelebrities(value, setSuggestions2, abortController2.current), 25);
       setShowSuggestions2(true);
     } else {
       setSuggestions2([]);
@@ -101,7 +101,33 @@ export default function SearchForm({ onSearch }) {
     if (input2Ref.current) input2Ref.current.blur();
   };
 
-  // No suggestions; IDs entered directly
+  // Handle immediate search when Enter is pressed
+  const handleKeyPress = async (e, field) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const value = field === 1 ? name1.trim() : name2.trim();
+      if (value) {
+        const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/$/, '');
+        try {
+          const res = await fetch(`${apiUrl}/api/search-celebrities-graph?q=${encodeURIComponent(value)}`);
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            if (field === 1) {
+              setSelectedId1(data[0].nconst);
+              setName1(data[0].name);
+              setShowSuggestions1(false);
+            } else {
+              setSelectedId2(data[0].nconst);
+              setName2(data[0].name);
+              setShowSuggestions2(false);
+            }
+          }
+        } catch (error) {
+          console.log('Search failed:', error);
+        }
+      }
+    }
+  };
 
   return (
     <form
@@ -143,6 +169,7 @@ export default function SearchForm({ onSearch }) {
           placeholder="Enter first celebrity name..."
           value={name1}
           onChange={(e) => { handleInput1(e); onChangeName1(e); }}
+          onKeyPress={(e) => handleKeyPress(e, 1)}
           onFocus={() => setShowSuggestions1(true)}
           onBlur={() => setTimeout(() => setShowSuggestions1(false), 100)}
         />
@@ -184,6 +211,7 @@ export default function SearchForm({ onSearch }) {
           placeholder="Enter second celebrity name..."
           value={name2}
           onChange={(e) => { handleInput2(e); onChangeName2(e); }}
+          onKeyPress={(e) => handleKeyPress(e, 2)}
           onFocus={() => setShowSuggestions2(true)}
           onBlur={() => setTimeout(() => setShowSuggestions2(false), 100)}
         />
