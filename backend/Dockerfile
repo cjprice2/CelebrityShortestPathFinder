@@ -9,10 +9,7 @@ RUN --mount=type=cache,id=s/73616753-6fb3-4cd8-b40c-5be58e266018-/root/.m2,targe
 # Copy sources (excluding large data files via .dockerignore)
 COPY src ./src
 
-# Copy the compressed database for production builds only (controlled by build arg)
-ARG INCLUDE_DATABASE=false
-COPY celebrity_graph.db.gz* ./
-RUN if [ "$INCLUDE_DATABASE" = "false" ]; then rm -f ./celebrity_graph.db.gz; fi
+# Database will be downloaded at runtime from GitHub releases
 
 # Package the app (skip tests) with Maven repo cache
 RUN --mount=type=cache,id=s/73616753-6fb3-4cd8-b40c-5be58e266018-/root/.m2,target=/root/.m2 mvn -q -DskipTests package
@@ -22,9 +19,6 @@ WORKDIR /app
 
 # Copy the built JAR
 COPY --from=build /app/target/*.jar /app/app.jar
-
-# Copy the compressed database for fast startup (if it exists)
-COPY --from=build /app/celebrity_graph.db.gz* /app/
 
 EXPOSE 8080
 ENV SERVER_ADDRESS=0.0.0.0
