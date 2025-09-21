@@ -48,6 +48,7 @@ backend/graph-cache.bin
 backend/graph-cache.bin.gz
 backend/src/main/resources/process_imdb_data.py
 celebrity_graph.db
+celebrity_graph.db.gz
 
 # Maven build output
 backend/target/

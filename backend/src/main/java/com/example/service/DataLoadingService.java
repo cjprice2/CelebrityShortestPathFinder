@@ -47,6 +47,10 @@ public class DataLoadingService {
                 System.out.println("Data loading skipped via SKIP_DATA_LOADING=true");
                 return;
             }
+            
+            // First, try to download pre-built database if it doesn't exist
+            downloadDatabaseIfNeeded();
+            
             // Check if data already exists
             long celebrityCount = celebrityRepository.count();
             if (celebrityCount > 0) {
@@ -72,6 +76,45 @@ public class DataLoadingService {
                 ensureIndexes();
             }
             loadDataFromFiles();
+        }
+    }
+    
+    private void downloadDatabaseIfNeeded() {
+        try {
+            String dbPath = System.getenv().getOrDefault("DB_PATH", "/app/data/celebrity_graph.db");
+            String dbUrl = System.getenv().getOrDefault("DATABASE_DOWNLOAD_URL", 
+                "https://github.com/YOUR_USERNAME/CelebrityShortestPathFinder/releases/download/v1.0.0/celebrity_graph.db.gz");
+            
+            java.io.File dbFile = new java.io.File(dbPath);
+            if (dbFile.exists() && dbFile.length() > 0) {
+                System.out.println("Database file already exists at: " + dbPath);
+                return;
+            }
+            
+            System.out.println("Downloading pre-built database from: " + dbUrl);
+            
+            // Download compressed database
+            java.net.URI uri = java.net.URI.create(dbUrl);
+            try (java.io.InputStream in = uri.toURL().openStream();
+                 java.util.zip.GZIPInputStream gzipIn = new java.util.zip.GZIPInputStream(in);
+                 java.io.FileOutputStream out = new java.io.FileOutputStream(dbFile)) {
+                
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                long totalBytes = 0;
+                while ((bytesRead = gzipIn.read(buffer)) != -1) {
+                    out.write(buffer, 0, bytesRead);
+                    totalBytes += bytesRead;
+                    if (totalBytes % (10 * 1024 * 1024) == 0) { // Log every 10MB
+                        System.out.println("Downloaded: " + (totalBytes / 1024 / 1024) + "MB");
+                    }
+                }
+                
+                System.out.println("Database download completed: " + (totalBytes / 1024 / 1024) + "MB");
+            }
+        } catch (Exception e) {
+            System.out.println("Failed to download database: " + e.getMessage());
+            System.out.println("Will attempt to load from local files instead...");
         }
     }
     
