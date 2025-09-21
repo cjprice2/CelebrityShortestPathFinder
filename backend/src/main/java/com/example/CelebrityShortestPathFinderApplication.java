@@ -31,7 +31,21 @@ public class CelebrityShortestPathFinderApplication implements CommandLineRunner
     
     @Override
     public void run(String... args) throws Exception {
-        // Data loading will be handled by @EventListener after context is ready
+        // Ensure data directory and empty database file exist before Spring tries to connect
+        String dbPath = System.getenv().getOrDefault("SPRING_DATASOURCE_URL", "jdbc:sqlite:/app/data/celebrity_graph.db");
+        if (dbPath.startsWith("jdbc:sqlite:")) {
+            String filePath = dbPath.substring("jdbc:sqlite:".length());
+            java.io.File dbFile = new java.io.File(filePath);
+            java.io.File parentDir = dbFile.getParentFile();
+            if (parentDir != null && !parentDir.exists()) {
+                parentDir.mkdirs();
+                System.out.println("Created data directory: " + parentDir.getAbsolutePath());
+            }
+            if (!dbFile.exists()) {
+                dbFile.createNewFile();
+                System.out.println("Created empty database file: " + dbFile.getAbsolutePath());
+            }
+        }
         System.out.println("Application started. Data loading will begin after context initialization...");
     }
     

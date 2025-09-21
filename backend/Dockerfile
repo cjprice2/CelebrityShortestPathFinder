@@ -20,6 +20,9 @@ WORKDIR /app
 # Copy the built JAR
 COPY --from=build /app/target/*.jar /app/app.jar
 
+# Create data directory for SQLite database
+RUN mkdir -p /app/data
+
 EXPOSE 8080
 ENV SERVER_ADDRESS=0.0.0.0
 ENV PORT=8080
