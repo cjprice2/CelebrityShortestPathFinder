@@ -48,6 +48,8 @@ public class CelebrityShortestPathFinderApplication implements CommandLineRunner
     public void onApplicationReady() {
         System.out.println("Application context is ready. Checking if data loading is needed...");
         dataLoadingService.loadDataFromFilesIfNeeded();
+        // Ensure indexes exist for fast lookups
+        dataLoadingService.ensureIndexes();
         System.out.println("Data loading check completed!");
     }
 

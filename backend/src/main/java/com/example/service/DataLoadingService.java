@@ -65,6 +65,30 @@ public class DataLoadingService {
             loadDataFromFiles();
         }
     }
+
+    // Ensure important indexes exist even if database is prebuilt with data
+    public void ensureIndexes() {
+        try (
+            var conn = dataSource.getConnection();
+            var stmt = conn.createStatement()
+        ) {
+            boolean prevAuto = conn.getAutoCommit();
+            try {
+                conn.setAutoCommit(true);
+                // Case-insensitive indexes to support COLLATE NOCASE prefix scans
+                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_celeb_name_nocase ON celebrities(name COLLATE NOCASE)");
+                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_title_name_nocase ON titles(name COLLATE NOCASE)");
+                // Relationship indexes (idempotent)
+                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_ct_celebrity ON celebrity_titles(celebrity_id)");
+                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_ct_title ON celebrity_titles(title_id)");
+            } finally {
+                try { conn.setAutoCommit(prevAuto); } catch (Exception ignore) {}
+            }
+            System.out.println("Indexes ensured successfully");
+        } catch (Exception e) {
+            System.out.println("Error ensuring indexes: " + e.getMessage());
+        }
+    }
     
     private void downloadDatabaseIfNeeded() {
         try {

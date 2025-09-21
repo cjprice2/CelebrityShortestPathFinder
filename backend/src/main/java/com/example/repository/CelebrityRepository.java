@@ -27,7 +27,7 @@ public interface CelebrityRepository extends JpaRepository<Celebrity, String> {
     // Additional bounded variant for better matching resolution
     List<Celebrity> findTop50ByNameContainingIgnoreCase(String name);
 
-    // Prefix search (index-friendly). Native query so SQLite can use B-Tree on name.
-    @Query(value = "SELECT * FROM celebrities WHERE name LIKE :prefix || '%' COLLATE NOCASE LIMIT 10", nativeQuery = true)
+    // Prefix search (index-friendly). ORDER BY with NOCASE ensures index range scan can be used
+    @Query(value = "SELECT * FROM celebrities WHERE name LIKE :prefix || '%' COLLATE NOCASE ORDER BY name COLLATE NOCASE LIMIT 10", nativeQuery = true)
     List<Celebrity> searchByNamePrefix(@Param("prefix") String prefix);
 }
