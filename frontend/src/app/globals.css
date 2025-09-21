@@ -21,6 +21,8 @@ html {
   /* Full screen coverage - no black bars */
   /* Responsive height - adapts to any screen size */
   min-height: 100vh;
+  height: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -31,4 +33,6 @@ body {
   padding: 0;
   /* Responsive height - adapts to any screen size */
   min-height: 100vh;
+  height: 100%;
+  overflow-x: hidden;
 }

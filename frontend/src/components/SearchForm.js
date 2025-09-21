@@ -133,6 +133,7 @@ export default function SearchForm({ onSearch }) {
     <form
       onSubmit={async e => {
         e.preventDefault();
+        const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/$/, '');
         let id1 = selectedId1;
         let id2 = selectedId2;
         
