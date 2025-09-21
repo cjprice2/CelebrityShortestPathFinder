@@ -6,6 +6,7 @@ export default function Footer() {
           {/* TMDB Attribution */}
           <div className="flex items-center justify-center gap-2 text-sm">
             <span>Celebrity photos powered by</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b.svg" 
               alt="TMDB" 

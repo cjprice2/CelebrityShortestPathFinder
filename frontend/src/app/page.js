@@ -82,7 +82,7 @@ export default function HomePage() {
           <div className="text-gray-300 text-xs space-y-0.5 flex flex-col items-center">
             <div className="flex items-start gap-1">
               <span className="text-blue-400 font-semibold min-w-[12px]">1.</span>
-              <span>Click each box and start typing a celebrity's name</span>
+              <span>Click each box and start typing a celebrity&apos;s name</span>
             </div>
             <div className="flex items-start gap-1">
               <span className="text-blue-400 font-semibold min-w-[12px]">2.</span>
