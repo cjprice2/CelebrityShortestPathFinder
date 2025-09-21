@@ -38,25 +38,3 @@ services:
   - key: SKIP_INDEX_ENSURE
     scope: RUN_TIME
     value: "false"
-
-- name: frontend
-  source_dir: frontend
-  github:
-    repo: cjprice2/CelebrityShortestPathFinder
-    branch: main
-    deploy_on_push: true
-  build_command: npm ci && npm run build
-  run_command: npm start
-  environment_slug: node-js
-  instance_count: 1
-  instance_size_slug: basic-xxs
-  http_port: 3000
-  routes:
-  - path: /
-  envs:
-  - key: NEXT_PUBLIC_API_URL
-    scope: RUN_AND_BUILD_TIME
-    value: "${backend.PUBLIC_URL}"
-  - key: PORT
-    scope: RUN_TIME
-    value: "3000"

@@ -3,8 +3,9 @@ const isGhPages = process.env.GITHUB_PAGES === 'true';
 const repoName = 'CelebrityShortestPathFinder';
 
 const nextConfig = {
-  output: 'standalone', // Creates a minimal server bundle
+  output: 'export',
   images: { unoptimized: true },
+  trailingSlash: true,
   // Only needed if deploying to project pages (username.github.io/repo)
   basePath: isGhPages ? `/${repoName}` : undefined,
   assetPrefix: isGhPages ? `/${repoName}/` : undefined,
