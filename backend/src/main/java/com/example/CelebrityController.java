@@ -44,7 +44,7 @@ public class CelebrityController {
         // This would need to be implemented in DatabaseGraphService
         return ResponseEntity.ok(Map.of(
             "message", "Database stats endpoint - implement in DatabaseGraphService",
-            "database_type", "SQLite"
+            "database_type", "MySQL"
         ));
     }
 

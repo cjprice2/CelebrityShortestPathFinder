@@ -9,7 +9,7 @@ A modern web application that finds the shortest path between two celebrities th
 - Typeahead search with celebrity photos
 - Clear selection state: green borders + checkmarks; submit gated until ready
 - Clickable IMDb links for people and titles
-- Fast startup from a prebuilt SQLite database
+- Fast startup with MySQL database
 - Client-side result caching with friendly timeouts/errors
 
 ## Dataset (at a glance)
@@ -22,10 +22,10 @@ A modern web application that finds the shortest path between two celebrities th
 
 ## How It Works
 
-1. On startup, the backend uses a prebuilt SQLite database (`celebrity_graph.db`) if present (mounted or downloaded once).
+1. On startup, the backend connects to a MySQL database and loads data from `cast.csv.gz`.
 2. Data loading creates tables and indexes for celebrities, titles, and relationships; the DB is persisted to speed restarts.
-3. Search suggestions come from the SQLite-backed index; selecting a suggestion captures IMDb IDs (`nmXXXXXXX`).
-4. Shortest paths are computed via bidirectional BFS over the SQLite-backed graph.
+3. Search suggestions come from the MySQL-backed index; selecting a suggestion captures IMDb IDs (`nmXXXXXXX`).
+4. Shortest paths are computed via bidirectional BFS over the MySQL-backed graph.
 5. Photos are fetched from TMDB (by IMDb ID) and cached in-memory; failed lookups are cached to avoid repeats.
 
 ## API Endpoints (used by the frontend)
@@ -44,6 +44,7 @@ A modern web application that finds the shortest path between two celebrities th
 
 - **Backend**: Java Spring Boot 3.5.6
 - **Frontend**: Next.js 15 with React
+- **Database**: MySQL 8.0
 - **Data Source**: IMDb Non-Commercial Datasets + TMDB for photos
 - **Algorithm**: Bidirectional BFS for shortest path
 - **Containerization**: Docker & Docker Compose

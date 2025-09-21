@@ -25,7 +25,22 @@ services:
     value: "database"
   - key: SPRING_DATASOURCE_URL
     scope: RUN_TIME
-    value: "jdbc:sqlite:/app/data/celebrity_graph.db"
+    value: "jdbc:mysql://db-mysql-nyc3-14508-do-user-26340291-0.k.db.ondigitalocean.com:25060/celebrity_graph?useSSL=true&serverTimezone=UTC&allowPublicKeyRetrieval=true"
+  - key: DB_HOST
+    scope: RUN_TIME
+    value: "db-mysql-nyc3-14508-do-user-26340291-0.k.db.ondigitalocean.com"
+  - key: DB_PORT
+    scope: RUN_TIME
+    value: "25060"
+  - key: DB_NAME
+    scope: RUN_TIME
+    value: "celebrity_graph"
+  - key: DB_USERNAME
+    scope: RUN_TIME
+    value: "doadmin"
+  - key: DB_PASSWORD
+    scope: RUN_TIME
+    type: SECRET
   - key: BFS_MAX_VISITED
     scope: RUN_TIME
     value: "3000000"
@@ -33,8 +48,5 @@ services:
     scope: RUN_TIME
     value: "1000000"
   - key: SKIP_DATA_LOADING
-    scope: RUN_TIME
-    value: "false"
-  - key: SKIP_INDEX_ENSURE
     scope: RUN_TIME
     value: "false"

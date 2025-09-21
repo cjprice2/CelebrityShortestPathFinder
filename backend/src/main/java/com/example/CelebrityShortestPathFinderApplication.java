@@ -20,27 +20,12 @@ public class CelebrityShortestPathFinderApplication implements CommandLineRunner
     public static void main(String[] args) {
         System.setProperty("server.address", "0.0.0.0");
         System.setProperty("server.port", "8080");
-        System.setProperty("spring.profiles.active", "database");
+        System.setProperty("spring.profiles.active", "mysql");
         SpringApplication.run(CelebrityShortestPathFinderApplication.class, args);
     }
     
     @Override
     public void run(String... args) throws Exception {
-        // Ensure data directory and empty database file exist before Spring tries to connect
-        String dbPath = System.getenv().getOrDefault("SPRING_DATASOURCE_URL", "jdbc:sqlite:/app/data/celebrity_graph.db");
-        if (dbPath.startsWith("jdbc:sqlite:")) {
-            String filePath = dbPath.substring("jdbc:sqlite:".length());
-            java.io.File dbFile = new java.io.File(filePath);
-            java.io.File parentDir = dbFile.getParentFile();
-            if (parentDir != null && !parentDir.exists()) {
-                parentDir.mkdirs();
-                System.out.println("Created data directory: " + parentDir.getAbsolutePath());
-            }
-            if (!dbFile.exists()) {
-                dbFile.createNewFile();
-                System.out.println("Created empty database file: " + dbFile.getAbsolutePath());
-            }
-        }
         System.out.println("Application started. Data loading will begin after context initialization...");
     }
     
@@ -48,8 +33,6 @@ public class CelebrityShortestPathFinderApplication implements CommandLineRunner
     public void onApplicationReady() {
         System.out.println("Application context is ready. Checking if data loading is needed...");
         dataLoadingService.loadDataFromFilesIfNeeded();
-        // Ensure indexes exist for fast lookups
-        dataLoadingService.ensureIndexes();
         System.out.println("Data loading check completed!");
     }
 

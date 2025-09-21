@@ -9,10 +9,8 @@ RUN --mount=type=cache,id=s/73616753-6fb3-4cd8-b40c-5be58e266018-/root/.m2,targe
 # Copy sources (excluding large data files via .dockerignore)
 COPY src ./src
 
-# Download database during build (more resources available)
+# Create data directory for JSON files
 RUN mkdir -p /app/data
-RUN wget -O /app/data/celebrity_graph.db.gz https://github.com/cjprice2/CelebrityShortestPathFinder/releases/download/v1.0.0/celebrity_graph.db.gz
-RUN gunzip /app/data/celebrity_graph.db.gz
 
 # Package the app (skip tests) with Maven repo cache
 RUN --mount=type=cache,id=s/73616753-6fb3-4cd8-b40c-5be58e266018-/root/.m2,target=/root/.m2 mvn -q -DskipTests package
@@ -23,8 +21,8 @@ WORKDIR /app
 # Copy the built JAR
 COPY --from=build /app/target/*.jar /app/app.jar
 
-# Copy the pre-downloaded database
-COPY --from=build /app/data/celebrity_graph.db /app/data/
+# Copy JSON data files if they exist
+COPY --from=build /app/data/ /app/data/
 
 EXPOSE 8080
 ENV SERVER_ADDRESS=0.0.0.0

@@ -10,7 +10,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import javax.sql.DataSource;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -34,20 +33,13 @@ public class DataLoadingService {
     @PersistenceContext
     private EntityManager entityManager;
     
-    @Autowired
-    private DataSource dataSource;
-    
-    
     public void loadDataFromFilesIfNeeded() {
+        if (Boolean.parseBoolean(System.getenv().getOrDefault("SKIP_DATA_LOADING", "false"))) {
+            System.out.println("Data loading skipped via SKIP_DATA_LOADING=true");
+            return;
+        }
+        
         try {
-            if (Boolean.parseBoolean(System.getenv().getOrDefault("SKIP_DATA_LOADING", "false"))) {
-                System.out.println("Data loading skipped via SKIP_DATA_LOADING=true");
-                return;
-            }
-            
-            // First, try to download pre-built database if it doesn't exist
-            downloadDatabaseIfNeeded();
-            
             // Check if data already exists
             long celebrityCount = celebrityRepository.count();
             if (celebrityCount > 0) {
@@ -56,143 +48,14 @@ public class DataLoadingService {
             }
             
             System.out.println("Database is empty. Starting data loading...");
-            createTablesIfNeeded(); // This already creates all necessary indexes
             loadDataFromFiles();
         } catch (Exception e) {
-            // If count() fails (tables don't exist), create tables and proceed with data loading
-            System.out.println("Tables not found. Creating tables and starting data loading...");
-            createTablesIfNeeded(); // This already creates all necessary indexes
+            // If count() fails (tables don't exist), Hibernate will create them automatically
+            System.out.println("Tables not found. Hibernate will create them automatically. Starting data loading...");
             loadDataFromFiles();
         }
     }
 
-    // Ensure important indexes exist even if database is prebuilt with data
-    public void ensureIndexes() {
-        try (
-            var conn = dataSource.getConnection();
-            var stmt = conn.createStatement()
-        ) {
-            boolean prevAuto = conn.getAutoCommit();
-            try {
-                conn.setAutoCommit(true);
-                // Case-insensitive indexes to support COLLATE NOCASE prefix scans
-                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_celeb_name_nocase ON celebrities(name COLLATE NOCASE)");
-                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_title_name_nocase ON titles(name COLLATE NOCASE)");
-                // Relationship indexes (idempotent)
-                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_ct_celebrity ON celebrity_titles(celebrity_id)");
-                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_ct_title ON celebrity_titles(title_id)");
-            } finally {
-                try { conn.setAutoCommit(prevAuto); } catch (Exception ignore) {}
-            }
-            System.out.println("Indexes ensured successfully");
-        } catch (Exception e) {
-            System.out.println("Error ensuring indexes: " + e.getMessage());
-        }
-    }
-    
-    private void downloadDatabaseIfNeeded() {
-        try {
-            String dbPath = System.getenv().getOrDefault("DB_PATH", "/app/data/celebrity_graph.db");
-            java.io.File dbFile = new java.io.File(dbPath);
-            
-            // Check if pre-built database exists and has data
-            if (dbFile.exists() && dbFile.length() > 0) {
-                try {
-                    long count = celebrityRepository.count();
-                    if (count > 0) {
-                        System.out.println("Pre-built database already exists with " + count + " celebrities at: " + dbPath);
-                        return;
-                    }
-                } catch (Exception e) {
-                    System.out.println("Existing database file appears corrupted: " + e.getMessage());
-                }
-            }
-            
-            // If no pre-built database, download from GitHub releases
-            String dbUrl = System.getenv().getOrDefault("DATABASE_DOWNLOAD_URL", 
-                "https://github.com/cjprice2/CelebrityShortestPathFinder/releases/download/v1.0.0/celebrity_graph.db.gz");
-            System.out.println("No pre-built database found, downloading from: " + dbUrl);
-            
-            java.io.File tempGzFile = new java.io.File(dbPath + ".gz");
-            java.net.URI uri = java.net.URI.create(dbUrl);
-            try (java.io.InputStream in = uri.toURL().openStream();
-                 java.io.FileOutputStream out = new java.io.FileOutputStream(tempGzFile)) {
-                
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                long totalBytes = 0;
-                while ((bytesRead = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, bytesRead);
-                    totalBytes += bytesRead;
-                    if (totalBytes % (10 * 1024 * 1024) == 0) { // Log every 10MB
-                        System.out.println("Downloaded: " + (totalBytes / 1024 / 1024) + "MB");
-                    }
-                }
-                
-                System.out.println("Database download completed: " + (totalBytes / 1024 / 1024) + "MB");
-            }
-            
-            // Extract the gzipped file
-            extractGzipFile(tempGzFile, dbFile);
-            tempGzFile.delete(); // Clean up temp file
-        } catch (Exception e) {
-            System.out.println("Failed to download database: " + e.getMessage());
-            System.out.println("Will attempt to load from local files instead...");
-        }
-    }
-    
-    private void extractGzipFile(java.io.File gzFile, java.io.File outputFile) throws Exception {
-        System.out.println("Extracting " + gzFile.getName() + " (" + (gzFile.length() / 1024 / 1024) + "MB) to " + outputFile.getPath());
-        
-        try (java.io.FileInputStream fis = new java.io.FileInputStream(gzFile);
-             java.util.zip.GZIPInputStream gzipIn = new java.util.zip.GZIPInputStream(fis);
-             java.io.FileOutputStream out = new java.io.FileOutputStream(outputFile)) {
-            
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-            long totalBytes = 0;
-            while ((bytesRead = gzipIn.read(buffer)) != -1) {
-                out.write(buffer, 0, bytesRead);
-                totalBytes += bytesRead;
-                if (totalBytes % (50 * 1024 * 1024) == 0) { // Log every 50MB
-                    System.out.println("Extracted: " + (totalBytes / 1024 / 1024) + "MB");
-                }
-            }
-            
-            System.out.println("Extraction completed: " + (totalBytes / 1024 / 1024) + "MB extracted to " + outputFile.getPath());
-        }
-    }
-    
-    public void createTablesIfNeeded() {
-        try (
-            var conn = dataSource.getConnection();
-            var stmt = conn.createStatement()
-        ) {
-            // Ensure autocommit so DDL executes immediately
-            boolean prevAuto = conn.getAutoCommit();
-            try {
-                conn.setAutoCommit(true);
-                // Create base tables
-                stmt.executeUpdate("CREATE TABLE IF NOT EXISTS celebrities (id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), index_id INTEGER)");
-                stmt.executeUpdate("CREATE TABLE IF NOT EXISTS titles (id VARCHAR(255) PRIMARY KEY, name VARCHAR(255), index_id INTEGER)");
-                // Match entity mapping: id surrogate key + columns
-                stmt.executeUpdate("CREATE TABLE IF NOT EXISTS celebrity_titles (id INTEGER PRIMARY KEY AUTOINCREMENT, celebrity_id VARCHAR(255), title_id VARCHAR(255))");
-                // Helpful indexes
-                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_ct_celebrity ON celebrity_titles(celebrity_id)");
-                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_ct_title ON celebrity_titles(title_id)");
-                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_celeb_name ON celebrities(name)");
-                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_title_name ON titles(name)");
-            } finally {
-                try { conn.setAutoCommit(prevAuto); } catch (Exception ignore) {}
-            }
-            System.out.println("Tables created successfully");
-        } catch (Exception e) {
-            System.out.println("Error creating tables: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    
     public void loadDataFromFiles() {
         String resourceDir = System.getenv().getOrDefault("GRAPH_RESOURCE_DIR", "backend/src/main/resources");
         String castFile = Paths.get(resourceDir, "cast.csv.gz").toString();
@@ -208,6 +71,11 @@ public class DataLoadingService {
                 System.err.println("cast.csv.gz is empty or unreadable");
                 return;
             }
+            
+            // Log the header for debugging
+            System.out.println("CSV Header: " + header);
+            String[] headerCols = splitSmart(header);
+            System.out.println("Detected " + headerCols.length + " columns: " + java.util.Arrays.toString(headerCols));
             String line;
             int lineCount = 0;
             int batchSize = Integer.parseInt(System.getenv().getOrDefault("BATCH_SIZE", "1000"));
@@ -230,8 +98,14 @@ public class DataLoadingService {
             String[] firstCols = splitSmart(firstDataRow);
             if (firstCols.length < 4) {
                 System.err.println("cast.csv.gz first data row missing columns (need 4): got " + firstCols.length);
+                System.err.println("First data row: " + firstDataRow);
+                System.err.println("Parsed columns: " + java.util.Arrays.toString(firstCols));
                 return;
             }
+            
+            // Log first data row for debugging
+            System.out.println("First data row: " + firstDataRow);
+            System.out.println("Parsed columns: " + java.util.Arrays.toString(firstCols));
             // Rewind handling: process the first row immediately
             {
                 String titleId = firstCols[0].trim();
@@ -257,8 +131,13 @@ public class DataLoadingService {
 
             while ((line = reader.readLine()) != null) {
                 lineCount++;
+                if (line.trim().isEmpty()) {
+                    continue; // Skip empty lines
+                }
+                
                 String[] cols = splitSmart(line);
                 if (cols.length < 4) {
+                    System.err.println("Skipping malformed row " + lineCount + " (need 4 columns, got " + cols.length + "): " + line);
                     continue;
                 }
                 String titleId = cols[0].trim();
@@ -295,6 +174,7 @@ public class DataLoadingService {
             }
             
             System.out.println("Data loading completed. Processed " + lineCount + " lines");
+            System.out.println("Loaded " + celebrityMap.size() + " unique celebrities and " + titleMap.size() + " unique titles");
             
         } catch (IOException e) {
             System.err.println("Error loading data: " + e.getMessage());
@@ -309,9 +189,6 @@ public class DataLoadingService {
         
         // Save relationships
         celebrityTitleRepository.saveAll(batch);
-        
-        // Release managed entities to reduce memory pressure between batches
-        try { entityManager.clear(); } catch (Exception ignore) {}
         
         // Clear maps to free memory
         celebrityMap.clear();
@@ -350,12 +227,31 @@ public class DataLoadingService {
     
     private String[] splitList(String field) {
         String f = trimQuotes(field);
-        if (f.isEmpty()) return new String[0];
-        String[] parts = f.split(",");
+        if (f.isEmpty() || f.equals("null")) return new String[0];
+        
+        // Handle different separators (comma, semicolon, pipe)
+        String[] parts;
+        if (f.contains(";")) {
+            parts = f.split(";");
+        } else if (f.contains("|")) {
+            parts = f.split("\\|");
+        } else {
+            parts = f.split(",");
+        }
+        
+        // Clean up each part
         for (int i = 0; i < parts.length; i++) {
             parts[i] = parts[i].trim();
+            // Remove empty entries
+            if (parts[i].isEmpty()) {
+                parts[i] = null;
+            }
         }
-        return parts;
+        
+        // Filter out null entries
+        return java.util.Arrays.stream(parts)
+                .filter(java.util.Objects::nonNull)
+                .toArray(String[]::new);
     }
     
     private String trimQuotes(String s) {

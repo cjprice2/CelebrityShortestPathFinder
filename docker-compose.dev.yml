@@ -1,4 +1,23 @@
 services:
+  mysql:
+    image: mysql:8.0
+    container_name: celebrity_mysql_dev
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-password}
+      MYSQL_DATABASE: celebrity_graph
+      MYSQL_USER: ${MYSQL_USER:-celebrity_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data_dev:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
   backend:
     build:
       context: ./backend
@@ -6,21 +25,24 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - sqlite_data:/app/data
       # Mount local .gz files for development
       - ./backend/src/main/resources:/app/src/main/resources:ro
-      # Mount local celebrity_graph.db.gz if it exists
-      - ./celebrity_graph.db.gz:/app/data/celebrity_graph.db.gz:ro
     environment:
       - JAVA_OPTS=-Xmx2g -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -XX:+UseCompressedOops -XX:+UseCompressedClassPointers -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/heap.hprof
       - TMDB_API_KEY=${TMDB_API_KEY}
       - GRAPH_RESOURCE_DIR=/app/src/main/resources
       - SPRING_PROFILES_ACTIVE=database
-      - SPRING_DATASOURCE_URL=jdbc:sqlite:/app/data/celebrity_graph.db
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=celebrity_graph
+      - DB_USERNAME=${MYSQL_USER:-celebrity_user}
+      - DB_PASSWORD=${MYSQL_PASSWORD:-password}
       - BFS_MAX_VISITED=3000000
       - BFS_MAX_QUEUE=1000000
       - SKIP_DATA_LOADING=false
-      - SKIP_INDEX_ENSURE=false
+    depends_on:
+      mysql:
+        condition: service_healthy
     restart: unless-stopped
     deploy:
       resources:
@@ -44,4 +66,4 @@ services:
       - backend
 
 volumes:
-  sqlite_data:
+  mysql_data_dev:
