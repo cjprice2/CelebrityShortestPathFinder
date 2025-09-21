@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import Image from "next/image";
+import { FaCheck } from "react-icons/fa";
 
 export default function SearchForm({ onSearch }) {
   const [name1, setName1] = useState("");
@@ -129,14 +130,17 @@ export default function SearchForm({ onSearch }) {
     }
   };
 
+  const isSelected1 = !!selectedId1;
+  const isSelected2 = !!selectedId2;
+  const canSubmit = isSelected1 && isSelected2;
+
   return (
     <form
       onSubmit={async e => {
         e.preventDefault();
-        const v1 = (selectedId1 || name1.trim());
-        const v2 = (selectedId2 || name2.trim());
-        if (!v1 || !v2) return;
-        onSearch(v1, v2);
+        // Enforce both selections before submitting
+        if (!canSubmit) return;
+        onSearch(selectedId1, selectedId2);
       }}
       className="flex flex-col gap-4 items-center w-full max-w-lg"
       autoComplete="off"
@@ -144,7 +148,7 @@ export default function SearchForm({ onSearch }) {
       <div className="relative w-full">
         <input
           ref={input1Ref}
-          className="w-full p-3 rounded bg-gray-800 text-white placeholder-gray-400 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={`w-full p-3 pr-10 rounded bg-gray-800 text-white placeholder-gray-400 border transition-colors duration-200 focus:outline-none ${isSelected1 ? 'border-green-500 focus:ring-2 focus:ring-green-500' : 'border-gray-700 focus:ring-2 focus:ring-blue-500'}`}
           placeholder="Enter first celebrity name..."
           value={name1}
           onChange={(e) => { handleInput1(e); onChangeName1(e); }}
@@ -152,6 +156,11 @@ export default function SearchForm({ onSearch }) {
           onFocus={() => setShowSuggestions1(true)}
           onBlur={() => setTimeout(() => setShowSuggestions1(false), 100)}
         />
+        {isSelected1 && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400">
+            <FaCheck />
+          </span>
+        )}
         {showSuggestions1 && suggestions1.length > 0 && (
           <ul className="absolute z-10 w-full bg-gray-900 border border-gray-700 rounded mt-1 max-h-60 overflow-y-auto">
             {suggestions1.map((item, idx) => (
@@ -186,7 +195,7 @@ export default function SearchForm({ onSearch }) {
       <div className="relative w-full">
         <input
           ref={input2Ref}
-          className="w-full p-3 rounded bg-gray-800 text-white placeholder-gray-400 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={`w-full p-3 pr-10 rounded bg-gray-800 text-white placeholder-gray-400 border transition-colors duration-200 focus:outline-none ${isSelected2 ? 'border-green-500 focus:ring-2 focus:ring-green-500' : 'border-gray-700 focus:ring-2 focus:ring-blue-500'}`}
           placeholder="Enter second celebrity name..."
           value={name2}
           onChange={(e) => { handleInput2(e); onChangeName2(e); }}
@@ -194,6 +203,11 @@ export default function SearchForm({ onSearch }) {
           onFocus={() => setShowSuggestions2(true)}
           onBlur={() => setTimeout(() => setShowSuggestions2(false), 100)}
         />
+        {isSelected2 && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400">
+            <FaCheck />
+          </span>
+        )}
         {showSuggestions2 && suggestions2.length > 0 && (
           <ul className="absolute z-10 w-full bg-gray-900 border border-gray-700 rounded mt-1 max-h-60 overflow-y-auto">
             {suggestions2.map((item, idx) => (
@@ -227,7 +241,9 @@ export default function SearchForm({ onSearch }) {
       </div>
       <button
         type="submit"
-        className="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 px-6 rounded transition-colors"
+        disabled={!canSubmit}
+        aria-disabled={!canSubmit}
+        className={`w-full font-bold py-3 px-6 rounded transition-colors ${canSubmit ? 'bg-blue-800 hover:bg-blue-900 text-white' : 'bg-gray-700 text-gray-300 cursor-not-allowed'}`}
       >
         Find Shortest Path
       </button>

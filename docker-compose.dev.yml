@@ -1,0 +1,47 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - sqlite_data:/app/data
+      # Mount local .gz files for development
+      - ./backend/src/main/resources:/app/src/main/resources:ro
+      # Mount local celebrity_graph.db.gz if it exists
+      - ./celebrity_graph.db.gz:/app/data/celebrity_graph.db.gz:ro
+    environment:
+      - JAVA_OPTS=-Xmx2g -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -XX:+UseCompressedOops -XX:+UseCompressedClassPointers -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/heap.hprof
+      - TMDB_API_KEY=${TMDB_API_KEY}
+      - GRAPH_RESOURCE_DIR=/app/src/main/resources
+      - SPRING_PROFILES_ACTIVE=database
+      - SPRING_DATASOURCE_URL=jdbc:sqlite:/app/data/celebrity_graph.db
+      - BFS_MAX_VISITED=3000000
+      - BFS_MAX_QUEUE=1000000
+      - SKIP_DATA_LOADING=false
+      - SKIP_INDEX_ENSURE=false
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 9G
+        reservations:
+          memory: 2G
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+      target: dev
+    environment:
+      # For development: frontend browser will connect to localhost:8080 (mapped from backend container)
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  sqlite_data:
