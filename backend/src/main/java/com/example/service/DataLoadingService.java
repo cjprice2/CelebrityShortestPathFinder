@@ -82,37 +82,22 @@ public class DataLoadingService {
                         return;
                     }
                 } catch (Exception e) {
-                    System.out.println("Existing database file appears corrupted, will re-extract/download: " + e.getMessage());
+                    System.out.println("Existing database file appears corrupted, will re-download: " + e.getMessage());
                 }
             }
             
-            // First, try to use baked-in .gz file in Docker, then check local development paths
-            java.io.File localGzFile = new java.io.File("/app/celebrity_graph.db.gz"); // Docker location (baked-in)
-            if (!localGzFile.exists()) {
-                localGzFile = new java.io.File("celebrity_graph.db.gz"); // Local development
-            }
-            if (!localGzFile.exists()) {
-                localGzFile = new java.io.File("../celebrity_graph.db.gz"); // Parent directory
-            }
-            if (localGzFile.exists()) {
-                System.out.println("Found celebrity_graph.db.gz at: " + localGzFile.getAbsolutePath() + ", extracting to: " + dbPath);
-                extractGzipFile(localGzFile, dbFile);
-                return;
-            }
+            // Download compressed database from GitHub releases
+            System.out.println("Downloading database from: " + dbUrl);
             
-            // If no local .gz file, download from URL
-            System.out.println("No celebrity_graph.db.gz found locally, downloading from: " + dbUrl);
-            
-            // Download compressed database
+            java.io.File tempGzFile = new java.io.File(dbPath + ".gz");
             java.net.URI uri = java.net.URI.create(dbUrl);
             try (java.io.InputStream in = uri.toURL().openStream();
-                 java.util.zip.GZIPInputStream gzipIn = new java.util.zip.GZIPInputStream(in);
-                 java.io.FileOutputStream out = new java.io.FileOutputStream(dbFile)) {
+                 java.io.FileOutputStream out = new java.io.FileOutputStream(tempGzFile)) {
                 
                 byte[] buffer = new byte[8192];
                 int bytesRead;
                 long totalBytes = 0;
-                while ((bytesRead = gzipIn.read(buffer)) != -1) {
+                while ((bytesRead = in.read(buffer)) != -1) {
                     out.write(buffer, 0, bytesRead);
                     totalBytes += bytesRead;
                     if (totalBytes % (10 * 1024 * 1024) == 0) { // Log every 10MB
@@ -122,6 +107,10 @@ public class DataLoadingService {
                 
                 System.out.println("Database download completed: " + (totalBytes / 1024 / 1024) + "MB");
             }
+            
+            // Extract the gzipped file
+            extractGzipFile(tempGzFile, dbFile);
+            tempGzFile.delete(); // Clean up temp file
         } catch (Exception e) {
             System.out.println("Failed to download database: " + e.getMessage());
             System.out.println("Will attempt to load from local files instead...");
