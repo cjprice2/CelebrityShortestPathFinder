@@ -1,14 +1,14 @@
 name: celebrity-shortest-path-finder
-region: nyc
 
 services:
 - name: backend
-  source_dir: /backend
+  source_dir: backend
   github:
     repo: cjprice2/CelebrityShortestPathFinder
     branch: main
     deploy_on_push: true
-  run_command: java -Xmx1g -Xms256m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -Dserver.address=0.0.0.0 -Dserver.port=$PORT -jar /app/target/*.jar
+  build_command: mvn clean package -DskipTests
+  run_command: java -Xmx1g -Xms256m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -Dserver.address=0.0.0.0 -Dserver.port=$PORT -jar target/*.jar
   environment_slug: java
   instance_count: 1
   instance_size_slug: basic-xxs
@@ -40,11 +40,12 @@ services:
     value: "false"
 
 - name: frontend
-  source_dir: /frontend
+  source_dir: frontend
   github:
-    repo: your-github-username/CelebrityShortestPathFinder
+    repo: cjprice2/CelebrityShortestPathFinder
     branch: main
     deploy_on_push: true
+  build_command: npm ci && npm run build
   run_command: npm start
   environment_slug: node-js
   instance_count: 1
@@ -59,10 +60,3 @@ services:
   - key: PORT
     scope: RUN_TIME
     value: "3000"
-
-databases:
-- engine: PG
-  name: celebrity-db
-  num_nodes: 1
-  size: db-s-dev-database
-  version: "12"
