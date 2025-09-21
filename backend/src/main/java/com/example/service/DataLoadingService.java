@@ -69,11 +69,9 @@ public class DataLoadingService {
     private void downloadDatabaseIfNeeded() {
         try {
             String dbPath = System.getenv().getOrDefault("DB_PATH", "/app/data/celebrity_graph.db");
-            String dbUrl = System.getenv().getOrDefault("DATABASE_DOWNLOAD_URL", 
-                "https://github.com/cjprice2/CelebrityShortestPathFinder/releases/download/v1.0.0/celebrity_graph.db.gz");
-            
             java.io.File dbFile = new java.io.File(dbPath);
-            // Check if database exists and has data by trying to count celebrities
+            
+            // Check if pre-built database exists and has data
             if (dbFile.exists() && dbFile.length() > 0) {
                 try {
                     long count = celebrityRepository.count();
@@ -82,12 +80,14 @@ public class DataLoadingService {
                         return;
                     }
                 } catch (Exception e) {
-                    System.out.println("Existing database file appears corrupted, will re-download: " + e.getMessage());
+                    System.out.println("Existing database file appears corrupted: " + e.getMessage());
                 }
             }
             
-            // Download compressed database from GitHub releases
-            System.out.println("Downloading database from: " + dbUrl);
+            // If no pre-built database, download from GitHub releases
+            String dbUrl = System.getenv().getOrDefault("DATABASE_DOWNLOAD_URL", 
+                "https://github.com/cjprice2/CelebrityShortestPathFinder/releases/download/v1.0.0/celebrity_graph.db.gz");
+            System.out.println("No pre-built database found, downloading from: " + dbUrl);
             
             java.io.File tempGzFile = new java.io.File(dbPath + ".gz");
             java.net.URI uri = java.net.URI.create(dbUrl);
