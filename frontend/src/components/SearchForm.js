@@ -62,7 +62,7 @@ export default function SearchForm({ onSearch }) {
     
     if (value.length > 0) {
       abortController1.current = new AbortController();
-      searchTimeout1.current = setTimeout(() => searchCelebrities(value, setSuggestions1, abortController1.current), 25);
+      searchTimeout1.current = setTimeout(() => searchCelebrities(value, setSuggestions1, abortController1.current), 50);
       setShowSuggestions1(true);
     } else {
       setSuggestions1([]);
@@ -78,7 +78,7 @@ export default function SearchForm({ onSearch }) {
     
     if (value.length > 0) {
       abortController2.current = new AbortController();
-      searchTimeout2.current = setTimeout(() => searchCelebrities(value, setSuggestions2, abortController2.current), 25);
+      searchTimeout2.current = setTimeout(() => searchCelebrities(value, setSuggestions2, abortController2.current), 50);
       setShowSuggestions2(true);
     } else {
       setSuggestions2([]);
