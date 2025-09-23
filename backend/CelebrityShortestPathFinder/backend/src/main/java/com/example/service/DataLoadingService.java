@@ -78,14 +78,6 @@ public class DataLoadingService {
         // Ensure schema/indexes needed for ON CONFLICT are present to avoid SQL grammar errors
         try {
             jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_celebrity_titles_pair ON celebrity_titles(celebrity_id, title_id)");
-            // Speed up neighbor lookups and joins during BFS
-            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_celebrity_titles_celebrity_id ON celebrity_titles(celebrity_id)");
-            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_celebrity_titles_title_id ON celebrity_titles(title_id)");
-            // Faster text search for name contains and id prefix
-            jdbcTemplate.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm");
-            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_celebrities_name_trgm ON celebrities USING gin (name gin_trgm_ops)");
-            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_celebrities_id_trgm ON celebrities USING gin (id gin_trgm_ops)");
-            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_celebrities_name_lower ON celebrities ((lower(name)))");
         } catch (Exception ignored) {}
         
         try (BufferedReader reader = new BufferedReader(
@@ -102,7 +94,7 @@ public class DataLoadingService {
             System.out.println("📊 Detected " + headerCols.length + " columns: " + java.util.Arrays.toString(headerCols));
             String line;
             int lineCount = 0;
-            int batchSize = Integer.parseInt(System.getenv().getOrDefault("BATCH_SIZE", "100000")); // Batch size (tune for your DB/WAL limits)
+            int batchSize = Integer.parseInt(System.getenv().getOrDefault("BATCH_SIZE", "1000")); // Smaller batches to avoid PostgreSQL limits
             
             // Use StringBuilder for bulk SQL - MUCH faster than JPA
             StringBuilder celebritySQL = new StringBuilder("INSERT INTO celebrities (id, name, index_id) VALUES ");
@@ -117,7 +109,6 @@ public class DataLoadingService {
             int relationCount = 0;
             
             long startTime = System.currentTimeMillis();
-            try { jdbcTemplate.execute("SET synchronous_commit = off"); } catch (Exception ignored) {}
             
             // Process data line by line
             while ((line = reader.readLine()) != null) {
@@ -187,12 +178,6 @@ public class DataLoadingService {
             System.out.println("📊 Processed " + lineCount + " lines in " + (totalTime/1000) + " seconds");
             System.out.println("📊 Final counts: " + seenCelebrities.size() + " unique celebrities, " + seenTitles.size() + " unique titles");
             System.out.println("⚡ Speed: " + (lineCount / Math.max(1, totalTime/1000)) + " lines/second");
-            // Update planner statistics
-            try {
-                jdbcTemplate.execute("ANALYZE celebrities");
-                jdbcTemplate.execute("ANALYZE titles");
-                jdbcTemplate.execute("ANALYZE celebrity_titles");
-            } catch (Exception ignored) {}
             
         } catch (IOException e) {
             System.err.println("❌ Error loading data: " + e.getMessage());

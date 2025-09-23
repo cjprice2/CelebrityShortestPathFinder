@@ -39,14 +39,18 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8080
+      PORT: 3000
     ports:
-      - "80:80"
+      - "3000:3000"
     depends_on:
       - backend
     restart: unless-stopped
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
 
 volumes:
   postgres_data:

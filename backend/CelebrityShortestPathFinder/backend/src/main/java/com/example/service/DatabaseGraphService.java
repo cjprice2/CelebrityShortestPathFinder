@@ -44,9 +44,7 @@ public class DatabaseGraphService {
         try {
             long startDegree = celebrityTitleRepository.countByCelebrityId(startId);
             long endDegree = celebrityTitleRepository.countByCelebrityId(endId);
-            if (Boolean.parseBoolean(System.getenv().getOrDefault("VERBOSE_LOGS", "false"))) {
-                System.out.println("BFS start: " + startId + " (deg=" + startDegree + "), end: " + endId + " (deg=" + endDegree + ")");
-            }
+            System.out.println("BFS start: " + startId + " (deg=" + startDegree + "), end: " + endId + " (deg=" + endDegree + ")");
             if (startDegree == 0 || endDegree == 0) {
                 return Collections.emptyList();
             }
@@ -71,22 +69,16 @@ public class DatabaseGraphService {
         // Try exact name (case-insensitive)
         Optional<Celebrity> exact = celebrityRepository.findByNameIgnoreCase(q);
         if (exact.isPresent()) {
-            if (Boolean.parseBoolean(System.getenv().getOrDefault("VERBOSE_LOGS", "false"))) {
-                System.out.println("Found celebrity by exact name: " + q + " -> " + exact.get().getId());
-            }
+            System.out.println("Found celebrity by exact name: " + q + " -> " + exact.get().getId());
             return exact.get().getId();
         }
         // Try partial name match limited (wider for better resolution)
         List<Celebrity> candidates = celebrityRepository.findTop50ByNameContainingIgnoreCase(q);
         if (!candidates.isEmpty()) {
-            if (Boolean.parseBoolean(System.getenv().getOrDefault("VERBOSE_LOGS", "false"))) {
-                System.out.println("Found celebrity by partial name: " + q + " -> " + candidates.get(0).getId() + " (" + candidates.get(0).getName() + ")");
-            }
+            System.out.println("Found celebrity by partial name: " + q + " -> " + candidates.get(0).getId() + " (" + candidates.get(0).getName() + ")");
             return candidates.get(0).getId();
         }
-        if (Boolean.parseBoolean(System.getenv().getOrDefault("VERBOSE_LOGS", "false"))) {
-            System.out.println("No celebrity found for query: " + q);
-        }
+        System.out.println("No celebrity found for query: " + q);
         return null;
     }
     

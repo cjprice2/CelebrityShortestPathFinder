@@ -23,7 +23,8 @@ export default function SearchForm({ onSearch }) {
     if (!q || q.trim().length < 2) { setSuggestions([]); return; }
     try {
       // Use graph-based search for exact nconst matches
-      const res = await fetch(`/api/search-celebrities-graph?q=${encodeURIComponent(q)}`, {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/api/search-celebrities-graph?q=${encodeURIComponent(q)}`, {
         signal: abortController.signal
       });
       const items = await res.json();
@@ -37,7 +38,7 @@ export default function SearchForm({ onSearch }) {
         if (!item.nconst) return; // Skip if no ID
         
         try {
-          const photoRes = await fetch(`/api/celebrity-photo?celebrityId=${encodeURIComponent(item.nconst)}&celebrityName=${encodeURIComponent(item.name)}`, {
+          const photoRes = await fetch(`${apiUrl}/api/celebrity-photo?celebrityId=${encodeURIComponent(item.nconst)}&celebrityName=${encodeURIComponent(item.name)}`, {
             signal: abortController.signal
           });
           const photoData = await photoRes.json();
@@ -109,8 +110,9 @@ export default function SearchForm({ onSearch }) {
       e.preventDefault();
       const value = field === 1 ? name1.trim() : name2.trim();
       if (value) {
+        const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/$/, '');
         try {
-          const res = await fetch(`/api/search-celebrities-graph?q=${encodeURIComponent(value)}`);
+          const res = await fetch(`${apiUrl}/api/search-celebrities-graph?q=${encodeURIComponent(value)}`);
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
             if (field === 1) {
