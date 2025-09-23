@@ -21,8 +21,8 @@ WORKDIR /app
 # Copy the built JAR
 COPY --from=build /app/target/*.jar /app/app.jar
 
-# Copy JSON data files if they exist
-COPY --from=build /app/data/ /app/data/
+# Copy resource data files if they exist
+COPY --from=build /app/src/main/resources/ /app/src/main/resources/
 
 EXPOSE 8080
 ENV SERVER_ADDRESS=0.0.0.0

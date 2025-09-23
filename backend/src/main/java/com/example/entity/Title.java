@@ -9,7 +9,7 @@ public class Title {
     @Column(name = "id")
     private String id;
     
-    @Column(name = "name")
+    @Column(name = "name", length = 1000)
     private String name;
     
     @Column(name = "index_id")

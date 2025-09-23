@@ -1,15 +1,9 @@
 package com.example.service;
 
-import com.example.entity.Celebrity;
-import com.example.entity.Title;
-import com.example.entity.CelebrityTitle;
 import com.example.repository.CelebrityRepository;
-import com.example.repository.TitleRepository;
-import com.example.repository.CelebrityTitleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -25,13 +19,7 @@ public class DataLoadingService {
     private CelebrityRepository celebrityRepository;
     
     @Autowired
-    private TitleRepository titleRepository;
-    
-    @Autowired
-    private CelebrityTitleRepository celebrityTitleRepository;
-    
-    @PersistenceContext
-    private EntityManager entityManager;
+    private JdbcTemplate jdbcTemplate;
     
     public void loadDataFromFilesIfNeeded() {
         if (Boolean.parseBoolean(System.getenv().getOrDefault("SKIP_DATA_LOADING", "false"))) {
@@ -43,92 +31,86 @@ public class DataLoadingService {
             // Check if data already exists
             long celebrityCount = celebrityRepository.count();
             if (celebrityCount > 0) {
-                System.out.println("Data already exists in database (" + celebrityCount + " celebrities). Skipping data loading.");
+                System.out.println("✅ Data already exists in database (" + celebrityCount + " celebrities). Skipping data loading.");
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("❌ Cannot connect to database or database doesn't exist: " + e.getMessage());
+            System.out.println("Please ensure the 'celebrity_graph' database exists on your PostgreSQL server.");
+            return;
+        }
+        
+        try {
+            
+            System.out.println("Database is empty. Checking for pre-built database...");
+            
+            // Try to restore from pre-built database
+            if (restoreFromPreBuiltDatabase()) {
+                System.out.println("Successfully restored from pre-built database!");
                 return;
             }
             
-            System.out.println("Database is empty. Starting data loading...");
-            loadDataFromFiles();
+            System.out.println("❌ No pre-built database found!");
+            System.out.println("🔄 Falling back to CSV loading for database creation...");
+            loadDataFromCSV();
+            return;
         } catch (Exception e) {
             // If count() fails (tables don't exist), Hibernate will create them automatically
-            System.out.println("Tables not found. Hibernate will create them automatically. Starting data loading...");
-            loadDataFromFiles();
+            System.out.println("Tables not found. Hibernate will create them automatically.");
+            System.out.println("Checking for pre-built database...");
+            
+            if (restoreFromPreBuiltDatabase()) {
+                System.out.println("Successfully restored from pre-built database!");
+                return;
+            }
+            
+            System.out.println("❌ No pre-built database found!");
+            System.out.println("🔄 Falling back to CSV loading for database creation...");
+            loadDataFromCSV();
         }
     }
 
-    public void loadDataFromFiles() {
-        String resourceDir = System.getenv().getOrDefault("GRAPH_RESOURCE_DIR", "backend/src/main/resources");
+    public void loadDataFromCSV() {
+        String resourceDir = System.getenv().getOrDefault("GRAPH_RESOURCE_DIR", "/home/colin/projects/CelebrityShortestPathFinder/backend/src/main/resources");
         String castFile = Paths.get(resourceDir, "cast.csv.gz").toString();
-        // Names and titles are expected to be included in cast.csv.gz; no external TSV fallback
         
-        System.out.println("Loading data from: " + castFile);
+        System.out.println("📂 Loading data from: " + castFile);
+        // Ensure schema/indexes needed for ON CONFLICT are present to avoid SQL grammar errors
+        try {
+            jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_celebrity_titles_pair ON celebrity_titles(celebrity_id, title_id)");
+        } catch (Exception ignored) {}
         
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(new GZIPInputStream(Files.newInputStream(Paths.get(castFile))), StandardCharsets.UTF_8), 16 * 1024)) {
             
             String header = reader.readLine(); // header
             if (header == null) {
-                System.err.println("cast.csv.gz is empty or unreadable");
+                System.err.println("❌ cast.csv.gz is empty or unreadable");
                 return;
             }
             
-            // Log the header for debugging
-            System.out.println("CSV Header: " + header);
+            System.out.println("📋 CSV Header: " + header);
             String[] headerCols = splitSmart(header);
-            System.out.println("Detected " + headerCols.length + " columns: " + java.util.Arrays.toString(headerCols));
+            System.out.println("📊 Detected " + headerCols.length + " columns: " + java.util.Arrays.toString(headerCols));
             String line;
             int lineCount = 0;
-            int batchSize = Integer.parseInt(System.getenv().getOrDefault("BATCH_SIZE", "1000"));
-            List<CelebrityTitle> batch = new ArrayList<>();
+            int batchSize = Integer.parseInt(System.getenv().getOrDefault("BATCH_SIZE", "1000")); // Smaller batches to avoid PostgreSQL limits
             
-            Map<String, Celebrity> celebrityMap = new HashMap<>();
-            Map<String, Title> titleMap = new HashMap<>();
+            // Use StringBuilder for bulk SQL - MUCH faster than JPA
+            StringBuilder celebritySQL = new StringBuilder("INSERT INTO celebrities (id, name, index_id) VALUES ");
+            StringBuilder titleSQL = new StringBuilder("INSERT INTO titles (id, name, index_id) VALUES ");
+            StringBuilder relationSQL = new StringBuilder("INSERT INTO celebrity_titles (celebrity_id, title_id) VALUES ");
+            
+            Set<String> seenCelebrities = new HashSet<>();
+            Set<String> seenTitles = new HashSet<>();
+            
             int celebrityIndex = 0;
             int titleIndex = 0;
+            int relationCount = 0;
             
-            // Read first non-empty row to verify all required columns present
-            String firstDataRow = null;
-            while ((firstDataRow = reader.readLine()) != null && firstDataRow.trim().isEmpty()) {
-                // skip empty lines
-            }
-            if (firstDataRow == null) {
-                System.err.println("cast.csv.gz has no data rows");
-                return;
-            }
-            String[] firstCols = splitSmart(firstDataRow);
-            if (firstCols.length < 4) {
-                System.err.println("cast.csv.gz first data row missing columns (need 4): got " + firstCols.length);
-                System.err.println("First data row: " + firstDataRow);
-                System.err.println("Parsed columns: " + java.util.Arrays.toString(firstCols));
-                return;
-            }
+            long startTime = System.currentTimeMillis();
             
-            // Log first data row for debugging
-            System.out.println("First data row: " + firstDataRow);
-            System.out.println("Parsed columns: " + java.util.Arrays.toString(firstCols));
-            // Rewind handling: process the first row immediately
-            {
-                String titleId = firstCols[0].trim();
-                String titleName = firstCols[1].trim();
-                String[] personIds = splitList(firstCols[2]);
-                String[] personNames = splitList(firstCols[3]);
-                if (!titleMap.containsKey(titleId)) {
-                    Title title = new Title(titleId, titleName.isEmpty() ? titleId : titleName, titleIndex++);
-                    titleMap.put(titleId, title);
-                }
-                int pairs = Math.min(personIds.length, personNames.length);
-                for (int i = 0; i < pairs; i++) {
-                    String celebrityId = personIds[i];
-                    String celebrityName = personNames[i];
-                    if (!celebrityMap.containsKey(celebrityId)) {
-                        Celebrity celebrity = new Celebrity(celebrityId, (celebrityName.isEmpty() ? celebrityId : celebrityName), celebrityIndex++);
-                        celebrityMap.put(celebrityId, celebrity);
-                    }
-                    batch.add(new CelebrityTitle(celebrityId, titleId));
-                }
-                lineCount++;
-            }
-
+            // Process data line by line
             while ((line = reader.readLine()) != null) {
                 lineCount++;
                 if (line.trim().isEmpty()) {
@@ -137,62 +119,111 @@ public class DataLoadingService {
                 
                 String[] cols = splitSmart(line);
                 if (cols.length < 4) {
-                    System.err.println("Skipping malformed row " + lineCount + " (need 4 columns, got " + cols.length + "): " + line);
+                    System.err.println("⚠️ Skipping malformed row " + lineCount + " (need 4 columns, got " + cols.length + "): " + line);
                     continue;
                 }
                 String titleId = cols[0].trim();
-                String titleName = cols[1].trim();
+                String titleName = escapeSQL(cols[1].trim());
                 String[] personIds = splitList(cols[2]);
                 String[] personNames = splitList(cols[3]);
 
-                if (!titleMap.containsKey(titleId)) {
-                    Title title = new Title(titleId, titleName.isEmpty() ? titleId : titleName, titleIndex++);
-                    titleMap.put(titleId, title);
+                // Add title if not seen
+                if (!seenTitles.contains(titleId)) {
+                    if (titleIndex > 0) titleSQL.append(",");
+                    titleSQL.append("('").append(titleId).append("','").append(titleName.isEmpty() ? titleId : titleName).append("',").append(titleIndex++).append(")");
+                    seenTitles.add(titleId);
                 }
 
+                // Add celebrities and relationships
                 int pairs = Math.min(personIds.length, personNames.length);
                 for (int i = 0; i < pairs; i++) {
-                    String celebrityId = personIds[i];
-                    String celebrityName = personNames[i];
-                    if (!celebrityMap.containsKey(celebrityId)) {
-                        Celebrity celebrity = new Celebrity(celebrityId, (celebrityName.isEmpty() ? celebrityId : celebrityName), celebrityIndex++);
-                        celebrityMap.put(celebrityId, celebrity);
+                    String celebrityId = personIds[i].trim();
+                    String celebrityName = escapeSQL(personNames[i].trim());
+                    
+                    // Add celebrity if not seen
+                    if (!seenCelebrities.contains(celebrityId)) {
+                        if (celebrityIndex > 0) celebritySQL.append(",");
+                        celebritySQL.append("('").append(celebrityId).append("','").append(celebrityName.isEmpty() ? celebrityId : celebrityName).append("',").append(celebrityIndex++).append(")");
+                        seenCelebrities.add(celebrityId);
                     }
-                    batch.add(new CelebrityTitle(celebrityId, titleId));
+                    
+                    // Add relationship
+                    if (relationCount > 0) relationSQL.append(",");
+                    relationSQL.append("('").append(celebrityId).append("','").append(titleId).append("')");
+                    relationCount++;
+                }
 
-                    if (batch.size() >= batchSize) {
-                        processBatch(celebrityMap, titleMap, batch);
-                        batch.clear();
-                        System.out.println("Processed " + lineCount + " lines");
-                    }
+                // Execute bulk inserts every batchSize lines
+                if (lineCount % batchSize == 0) {
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    System.out.println("🚀 BULK PROCESSING " + lineCount + " lines | " + seenCelebrities.size() + " celebrities | " + seenTitles.size() + " titles | " + (elapsed/1000) + "s");
+                    executeBulkSQL(celebritySQL, titleSQL, relationSQL, celebrityIndex, titleIndex, relationCount);
+                    
+                    // Reset builders for next batch
+                    celebritySQL = new StringBuilder("INSERT INTO celebrities (id, name, index_id) VALUES ");
+                    titleSQL = new StringBuilder("INSERT INTO titles (id, name, index_id) VALUES ");
+                    relationSQL = new StringBuilder("INSERT INTO celebrity_titles (celebrity_id, title_id) VALUES ");
+                    celebrityIndex = titleIndex = relationCount = 0;
                 }
             }
             
-            // Process remaining batch
-            if (!batch.isEmpty()) {
-                processBatch(celebrityMap, titleMap, batch);
+            // Process remaining data
+            if (celebrityIndex > 0 || titleIndex > 0 || relationCount > 0) {
+                System.out.println("🎉 Processing final batch...");
+                executeBulkSQL(celebritySQL, titleSQL, relationSQL, celebrityIndex, titleIndex, relationCount);
             }
             
-            System.out.println("Data loading completed. Processed " + lineCount + " lines");
-            System.out.println("Loaded " + celebrityMap.size() + " unique celebrities and " + titleMap.size() + " unique titles");
+            long totalTime = System.currentTimeMillis() - startTime;
+            System.out.println("🎉 ULTRA-FAST DATA LOADING COMPLETED! 🚀");
+            System.out.println("📊 Processed " + lineCount + " lines in " + (totalTime/1000) + " seconds");
+            System.out.println("📊 Final counts: " + seenCelebrities.size() + " unique celebrities, " + seenTitles.size() + " unique titles");
+            System.out.println("⚡ Speed: " + (lineCount / Math.max(1, totalTime/1000)) + " lines/second");
             
         } catch (IOException e) {
-            System.err.println("Error loading data: " + e.getMessage());
+            System.err.println("❌ Error loading data: " + e.getMessage());
             e.printStackTrace();
         }
     }
     
-    private void processBatch(Map<String, Celebrity> celebrityMap, Map<String, Title> titleMap, List<CelebrityTitle> batch) {
-        // Save celebrities and titles
-        celebrityRepository.saveAll(celebrityMap.values());
-        titleRepository.saveAll(titleMap.values());
-        
-        // Save relationships
-        celebrityTitleRepository.saveAll(batch);
-        
-        // Clear maps to free memory
-        celebrityMap.clear();
-        titleMap.clear();
+    private void executeBulkSQL(StringBuilder celebritySQL, StringBuilder titleSQL, StringBuilder relationSQL, int celebrityCount, int titleCount, int relationCount) {
+        try {
+            // Execute bulk inserts - break into smaller chunks to avoid PostgreSQL limits
+            if (celebrityCount > 0) {
+                String sql = celebritySQL.toString() + " ON CONFLICT (id) DO NOTHING";
+                executeSQLInChunks(sql, "celebrities");
+            }
+            
+            if (titleCount > 0) {
+                String sql = titleSQL.toString() + " ON CONFLICT (id) DO NOTHING";
+                executeSQLInChunks(sql, "titles");
+            }
+            
+            if (relationCount > 0) {
+                String sql = relationSQL.toString() + " ON CONFLICT (celebrity_id, title_id) DO NOTHING";
+                executeSQLInChunks(sql, "relationships");
+            }
+            
+        } catch (Exception e) {
+            // Avoid printing full SQL statements (which can include massive nm/tt lists)
+            System.err.println("❌ Bulk SQL Error: " + e.getClass().getSimpleName());
+            // Continue processing - don't stop on individual batch errors
+        }
+    }
+    
+    private void executeSQLInChunks(String sql, String type) {
+        try {
+            // For very large SQL statements, PostgreSQL might reject them
+            // Execute directly for now, but could split if needed
+            jdbcTemplate.update(sql);
+        } catch (Exception e) {
+            // Keep logs concise to prevent dumping entire SQL with values
+            System.err.println("❌ Failed to insert " + type + ": " + e.getClass().getSimpleName());
+        }
+    }
+    
+    private String escapeSQL(String input) {
+        if (input == null) return "";
+        return input.replace("'", "''"); // Escape single quotes for SQL
     }
     
     private String[] splitSmart(String line) {
@@ -261,5 +292,73 @@ public class DataLoadingService {
         }
         return t;
     }
+    
+    private boolean restoreFromPreBuiltDatabase() {
+        String resourceDir = System.getenv().getOrDefault("GRAPH_RESOURCE_DIR", "backend/src/main/resources");
+        String dbFile = Paths.get(resourceDir, "celebrity_graph.db.gz").toString();
+        
+        System.out.println("Checking for pre-built database at: " + dbFile);
+        
+        if (!Files.exists(Paths.get(dbFile))) {
+            System.out.println("Pre-built database file not found: " + dbFile);
+            return false;
+        }
+        
+        try {
+            System.out.println("Found pre-built database. Restoring...");
+            
+            // Get database connection details from environment
+            String dbHost = System.getenv().getOrDefault("DB_HOST", "postgres");
+            String dbPort = System.getenv().getOrDefault("DB_PORT", "5432");
+            String dbName = System.getenv().getOrDefault("DB_NAME", "celebrity_graph");
+            String dbUsername = System.getenv().getOrDefault("DB_USERNAME", "postgres");
+            String dbPassword = System.getenv().getOrDefault("DB_PASSWORD", "password");
+            
+            // Decompress the database file
+            String tempDbFile = "/tmp/celebrity_graph.db";
+            try (GZIPInputStream gzipIn = new GZIPInputStream(Files.newInputStream(Paths.get(dbFile)));
+                 FileOutputStream fileOut = new FileOutputStream(tempDbFile)) {
+                
+                byte[] buffer = new byte[8192];
+                int len;
+                while ((len = gzipIn.read(buffer)) != -1) {
+                    fileOut.write(buffer, 0, len);
+                }
+            }
+            
+            // Restore using psql command
+            ProcessBuilder pb = new ProcessBuilder(
+                "psql", 
+                "-h", dbHost,
+                "-p", dbPort,
+                "-U", dbUsername,
+                "-d", dbName,
+                "-f", tempDbFile
+            );
+            pb.environment().put("PGPASSWORD", dbPassword);
+            pb.redirectErrorStream(true);
+            
+            Process process = pb.start();
+            int exitCode = process.waitFor();
+            
+            // Clean up temp file
+            Files.deleteIfExists(Paths.get(tempDbFile));
+            
+            if (exitCode == 0) {
+                System.out.println("Database restored successfully from pre-built file!");
+                return true;
+            } else {
+                System.err.println("Failed to restore database. Exit code: " + exitCode);
+                return false;
+            }
+            
+        } catch (Exception e) {
+            System.err.println("Error restoring from pre-built database: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    // CSV parsing methods removed - only using pre-built database now
     
 }

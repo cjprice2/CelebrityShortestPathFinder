@@ -1,62 +1,56 @@
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: celebrity_mysql
+  postgres:
+    image: postgres:15
+    container_name: celebrity_postgres
+    command: ["postgres", "-c", "max_wal_size=4GB"]
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
-      MYSQL_DATABASE: celebrity_graph
-      MYSQL_USER: ${MYSQL_USER:-celebrity_user}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-password}
+      POSTGRES_DB: celebrity_graph
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - mysql_data:/var/lib/mysql
-    command: --default-authentication-plugin=mysql_native_password
+      - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       timeout: 20s
       retries: 10
 
   backend:
-    image: cjprice2/celebrity-backend:latest
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     environment:
-      - JAVA_OPTS=-Xmx2g -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -XX:+UseCompressedOops -XX:+UseCompressedClassPointers -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/heap.hprof
+      - JAVA_OPTS=-Xmx2g -Xms512m
       - TMDB_API_KEY=${TMDB_API_KEY}
-      - GRAPH_RESOURCE_DIR=/app/src/main/resources
       - SPRING_PROFILES_ACTIVE=database
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_NAME=celebrity_graph
-      - DB_USERNAME=${MYSQL_USER:-celebrity_user}
-      - DB_PASSWORD=${MYSQL_PASSWORD:-password}
-      - BFS_MAX_VISITED=3000000
-      - BFS_MAX_QUEUE=1000000
-      - SKIP_DATA_LOADING=false
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/celebrity_graph
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=password
+      - GRAPH_RESOURCE_DIR=/app/src/main/resources
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 9G
-        reservations:
-          memory: 2G
 
   frontend:
-    image: cjprice2/celebrity-frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://backend:8080}
+      NEXT_PUBLIC_API_URL: http://localhost:8080
       PORT: 3000
     ports:
       - "3000:3000"
     depends_on:
       - backend
     restart: unless-stopped
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
 
 volumes:
-  mysql_data:
-
+  postgres_data:

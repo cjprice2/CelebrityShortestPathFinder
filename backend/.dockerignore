@@ -2,18 +2,17 @@ target
 .git
 .gitignore
 *.log
-# Explicitly exclude large data files
+# (allow CSV file to create pre-built database)
 src/main/resources/cast.csv.gz
 src/main/resources/name.basics.tsv.gz
 src/main/resources/title.basics.tsv.gz
 src/main/resources/title.principals.tsv.gz
 
-# General patterns for any other data files (but allow celebrity_graph.db.gz)
+# General patterns for any other data files
 **/*.tsv
 **/*.tsv.gz
 **/*.csv
 **/*.csv.gz
-!celebrity_graph.db.gz
 **/*.db
 **/*.db-journal
 filtered_*.json
