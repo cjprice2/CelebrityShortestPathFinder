@@ -58,7 +58,7 @@ A modern web application that finds the shortest path between two celebrities th
 
 ```
 CelebrityShortestPathFinder/
-├── backend/                      # Spring Boot API server
+├── backend/                     # Spring Boot API server
 │   ├── src/main/java/           # Java source code
 │   ├── src/main/resources/      # Data files (cast.csv.gz, etc.)
 │   ├── pom.xml                  # Maven configuration
@@ -66,8 +66,6 @@ CelebrityShortestPathFinder/
 ├── frontend/                    # Next.js app
 │   ├── src/                     # React source code
 │   ├── Dockerfile               # Prod container
-│   └── Dockerfile.dev           # Dev container (hot reload)
-├── docker-compose.yml           # Default compose (images)
-├── docker-compose.dev.yml       # Dev compose (builds from source, mounts data)
+├── docker-compose.yml           # Prod compose
 └── README.md
 ```
