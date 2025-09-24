@@ -17,47 +17,65 @@ export default function SearchForm({ onSearch }) {
   const [showSearchButton2, setShowSearchButton2] = useState(true);
   const input1Ref = useRef(null);
   const input2Ref = useRef(null);
+  const hideTimeout1Ref = useRef(null);
+  const hideTimeout2Ref = useRef(null);
   const searchTimeout1 = useRef(null);
   const searchTimeout2 = useRef(null);
   const abortController1 = useRef(null);
   const abortController2 = useRef(null);
   // simple in-memory cache for suggestions (TTL 60s, max 100 entries)
   const cacheRef = useRef(new Map());
-  // cache for celebrity photos
-  const photoCacheRef = useRef(new Map());
+  const CACHE_STORAGE_KEY = 'celebritySuggestionsCacheV1';
+  const CACHE_TTL_MS = 60000;
+  const MAX_CACHE_ENTRIES = 100;
 
-  // Get celebrity photo URL
-  const getCelebrityPhoto = async (celebrityId, celebrityName) => {
-    if (!celebrityId) return null;
-    
-    // Check photo cache first
-    const cachedPhoto = photoCacheRef.current.get(celebrityId);
-    if (cachedPhoto) return cachedPhoto;
-    
+  // Persist cache to localStorage so both inputs benefit across reloads
+  const persistCache = () => {
     try {
-      const response = await fetch(`/api/celebrity-photo?celebrityId=${encodeURIComponent(celebrityId)}&celebrityName=${encodeURIComponent(celebrityName || '')}`);
-      const data = await response.json();
-      const photoUrl = data.photoUrl;
-      
-      if (photoUrl) {
-        photoCacheRef.current.set(celebrityId, photoUrl);
-        return photoUrl;
+      // Serialize as array of [key, value]
+      const entries = Array.from(cacheRef.current.entries());
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(entries));
       }
-    } catch (error) {
-      console.log('Error fetching photo:', error);
+    } catch (_) {
+      // ignore storage errors
     }
-    
-    return null;
   };
+
+  // Hydrate cache from localStorage on mount
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const raw = window.localStorage.getItem(CACHE_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      const now = Date.now();
+      const hydrated = new Map();
+      for (const [key, value] of parsed) {
+        if (value && typeof value === 'object' && Array.isArray(value.data) && typeof value.t === 'number') {
+          // Respect TTL (60s)
+          if (now - value.t < CACHE_TTL_MS) {
+            hydrated.set(key, value);
+          }
+        }
+      }
+      cacheRef.current = hydrated;
+    } catch (_) {
+      // ignore parse/storage errors
+    }
+  }, []);
+
+  // Removed unused photo cache/getter; SuggestionItem handles its own photo fetching
 
   // Cleanup cache to prevent memory leaks
   const cleanupCache = () => {
     const now = Date.now();
-    const maxEntries = 100;
+    const maxEntries = MAX_CACHE_ENTRIES;
     
     // Remove expired entries
     for (const [key, value] of cacheRef.current.entries()) {
-      if (now - value.t > 60000) {
+      if (now - value.t > CACHE_TTL_MS) {
         cacheRef.current.delete(key);
       }
     }
@@ -71,6 +89,74 @@ export default function SearchForm({ onSearch }) {
         .slice(0, maxEntries)
         .forEach(([key, value]) => cacheRef.current.set(key, value));
     }
+    // Persist latest state
+    persistCache();
+  };
+
+  // Helpers to reduce duplication for two inputs
+  const getField = (field) => field === 1 ? {
+    name: name1,
+    setName: setName1,
+    selectedId: selectedId1,
+    setSelectedId: setSelectedId1,
+    suggestions: suggestions1,
+    setSuggestions: setSuggestions1,
+    showSuggestions: showSuggestions1,
+    setShowSuggestions: setShowSuggestions1,
+    isSearching: isSearching1,
+    setIsSearching: setIsSearching1,
+    showSearchButton: showSearchButton1,
+    setShowSearchButton: setShowSearchButton1,
+    inputRef: input1Ref,
+    hideTimeoutRef: hideTimeout1Ref,
+    abortController: abortController1,
+  } : {
+    name: name2,
+    setName: setName2,
+    selectedId: selectedId2,
+    setSelectedId: setSelectedId2,
+    suggestions: suggestions2,
+    setSuggestions: setSuggestions2,
+    showSuggestions: showSuggestions2,
+    setShowSuggestions: setShowSuggestions2,
+    isSearching: isSearching2,
+    setIsSearching: setIsSearching2,
+    showSearchButton: showSearchButton2,
+    setShowSearchButton: setShowSearchButton2,
+    inputRef: input2Ref,
+    hideTimeoutRef: hideTimeout2Ref,
+    abortController: abortController2,
+  };
+
+  const handleInput = (e, field) => {
+    const f = getField(field);
+    const v = e.target.value;
+    f.setName(v);
+    f.setSelectedId("");
+    f.setShowSuggestions(false);
+    f.setShowSearchButton(true);
+  };
+
+  const handleSearch = async (field) => {
+    const f = getField(field);
+    const value = f.name;
+    if (value.trim().length < 2) return;
+    f.setShowSearchButton(false);
+    if (f.abortController.current) f.abortController.current.abort();
+    f.abortController.current = new AbortController();
+    await searchCelebrities(value, f.setSuggestions, f.abortController.current, f.setIsSearching);
+    if (f.hideTimeoutRef.current) { clearTimeout(f.hideTimeoutRef.current); f.hideTimeoutRef.current = null; }
+    f.setShowSuggestions(true);
+  };
+
+  const handleSuggestionClick = (field, item) => {
+    const f = getField(field);
+    f.setSelectedId(item.nconst);
+    f.setName(item.name);
+    f.setSuggestions([]);
+    f.setShowSuggestions(false);
+    f.setShowSearchButton(false);
+    if (f.inputRef.current) f.inputRef.current.blur();
   };
 
   // Search celebrities in the graph for suggestions
@@ -96,6 +182,8 @@ export default function SearchForm({ onSearch }) {
       const suggestions = Array.isArray(items) ? items.slice(0, 20).map(x => ({ nconst: x.nconst, name: x.name })) : [];
       setSuggestions(suggestions);
       cacheRef.current.set(q, { t: Date.now(), data: suggestions });
+      // Persist for both inputs to use after reloads
+      persistCache();
     } catch {
       setSuggestions([]);
     } finally {
@@ -103,67 +191,13 @@ export default function SearchForm({ onSearch }) {
     }
   };
 
-  const handleInput1 = (e) => { 
-    const v = e.target.value; 
-    setName1(v); 
-    setSelectedId1(""); 
-    setShowSuggestions1(false);
-    setShowSearchButton1(true);
-  };
-
-  const handleInput2 = (e) => { 
-    const v = e.target.value; 
-    setName2(v); 
-    setSelectedId2(""); 
-    setShowSuggestions2(false);
-    setShowSearchButton2(true);
-  };
-
-  const handleSearch1 = async () => {
-    if (name1.trim().length < 2) return;
-    setShowSearchButton1(false);
-    if (abortController1.current) abortController1.current.abort();
-    abortController1.current = new AbortController();
-    await searchCelebrities(name1, setSuggestions1, abortController1.current, setIsSearching1);
-    setShowSuggestions1(true);
-  };
-
-  const handleSearch2 = async () => {
-    if (name2.trim().length < 2) return;
-    setShowSearchButton2(false);
-    if (abortController2.current) abortController2.current.abort();
-    abortController2.current = new AbortController();
-    await searchCelebrities(name2, setSuggestions2, abortController2.current, setIsSearching2);
-    setShowSuggestions2(true);
-  };
-
-  const handleSuggestionClick1 = (item) => {
-    setSelectedId1(item.nconst);
-    setName1(item.name);
-    setSuggestions1([]);
-    setShowSuggestions1(false);
-    setShowSearchButton1(false);
-    if (input1Ref.current) input1Ref.current.blur();
-  };
-
-  const handleSuggestionClick2 = (item) => {
-    setSelectedId2(item.nconst);
-    setName2(item.name);
-    setSuggestions2([]);
-    setShowSuggestions2(false);
-    setShowSearchButton2(false);
-    if (input2Ref.current) input2Ref.current.blur();
-  };
+  // Removed per-field duplicates in favor of generic handlers above
 
   // Handle immediate search when Enter is pressed
   const handleKeyPress = async (e, field) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (field === 1) {
-        await handleSearch1();
-      } else {
-        await handleSearch2();
-      }
+      await handleSearch(field);
     }
   };
 
@@ -177,6 +211,59 @@ export default function SearchForm({ onSearch }) {
   const isSelected2 = !!selectedId2;
   const canSubmit = isSelected1 && isSelected2;
 
+  const renderInput = (field, placeholder) => {
+    const f = getField(field);
+    const isSelected = !!f.selectedId;
+    return (
+      <div className="relative w-full">
+        <input
+          ref={f.inputRef}
+          className={`w-full p-3 pr-10 rounded bg-gray-800 text-white placeholder-gray-400 border transition-colors duration-200 focus:outline-none ${isSelected ? 'border-green-500 focus:ring-2 focus:ring-green-500' : 'border-gray-700 focus:ring-2 focus:ring-blue-500'}`}
+          placeholder={placeholder}
+          value={f.name}
+          onChange={(e) => handleInput(e, field)}
+          onKeyPress={(e) => handleKeyPress(e, field)}
+          onBlur={() => {
+            if (f.hideTimeoutRef.current) clearTimeout(f.hideTimeoutRef.current);
+            f.hideTimeoutRef.current = setTimeout(() => {
+              f.setShowSuggestions(false);
+              f.hideTimeoutRef.current = null;
+            }, 150);
+          }}
+        />
+        {isSelected ? (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400">
+            <FaCheck />
+          </span>
+        ) : f.isSearching ? (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400">
+            <FaSpinner className="animate-spin" />
+          </span>
+        ) : f.showSearchButton ? (
+          <button
+            type="button"
+            onClick={() => handleSearch(field)}
+            disabled={f.name.trim().length < 2}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-blue-400 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors rounded-md hover:bg-gray-700"
+          >
+            <FaSearch className="text-lg" />
+          </button>
+        ) : null}
+        {f.showSuggestions && f.suggestions.length > 0 && (
+          <ul className="absolute z-10 w-full bg-gray-900 border border-gray-700 rounded mt-1 max-h-60 overflow-y-auto">
+            {f.suggestions.map((item, idx) => (
+              <SuggestionItem
+                key={idx}
+                item={item}
+                onClick={() => handleSuggestionClick(field, item)}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  };
+
   return (
     <form
       onSubmit={async e => {
@@ -188,86 +275,8 @@ export default function SearchForm({ onSearch }) {
       className="flex flex-col gap-4 items-center w-full max-w-lg"
       autoComplete="off"
     >
-      <div className="relative w-full">
-        <input
-          ref={input1Ref}
-          className={`w-full p-3 pr-10 rounded bg-gray-800 text-white placeholder-gray-400 border transition-colors duration-200 focus:outline-none ${isSelected1 ? 'border-green-500 focus:ring-2 focus:ring-green-500' : 'border-gray-700 focus:ring-2 focus:ring-blue-500'}`}
-          placeholder="Enter first celebrity name..."
-          value={name1}
-          onChange={handleInput1}
-          onKeyPress={(e) => handleKeyPress(e, 1)}
-          onBlur={() => setTimeout(() => setShowSuggestions1(false), 100)}
-        />
-        {isSelected1 ? (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400">
-            <FaCheck />
-          </span>
-        ) : isSearching1 ? (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400">
-            <FaSpinner className="animate-spin" />
-          </span>
-        ) : showSearchButton1 ? (
-          <button
-            type="button"
-            onClick={handleSearch1}
-            disabled={name1.trim().length < 2}
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-blue-400 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors rounded-md hover:bg-gray-700"
-          >
-            <FaSearch className="text-lg" />
-          </button>
-        ) : null}
-        {showSuggestions1 && suggestions1.length > 0 && (
-          <ul className="absolute z-10 w-full bg-gray-900 border border-gray-700 rounded mt-1 max-h-60 overflow-y-auto">
-            {suggestions1.map((item, idx) => (
-              <SuggestionItem
-                key={idx}
-                item={item}
-                onClick={() => handleSuggestionClick1(item)}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
-      <div className="relative w-full">
-        <input
-          ref={input2Ref}
-          className={`w-full p-3 pr-10 rounded bg-gray-800 text-white placeholder-gray-400 border transition-colors duration-200 focus:outline-none ${isSelected2 ? 'border-green-500 focus:ring-2 focus:ring-green-500' : 'border-gray-700 focus:ring-2 focus:ring-blue-500'}`}
-          placeholder="Enter second celebrity name..."
-          value={name2}
-          onChange={handleInput2}
-          onKeyPress={(e) => handleKeyPress(e, 2)}
-          onBlur={() => setTimeout(() => setShowSuggestions2(false), 100)}
-        />
-        {isSelected2 ? (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400">
-            <FaCheck />
-          </span>
-        ) : isSearching2 ? (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400">
-            <FaSpinner className="animate-spin" />
-          </span>
-        ) : showSearchButton2 ? (
-          <button
-            type="button"
-            onClick={handleSearch2}
-            disabled={name2.trim().length < 2}
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-blue-400 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors rounded-md hover:bg-gray-700"
-          >
-            <FaSearch className="text-lg" />
-          </button>
-        ) : null}
-        {showSuggestions2 && suggestions2.length > 0 && (
-          <ul className="absolute z-10 w-full bg-gray-900 border border-gray-700 rounded mt-1 max-h-60 overflow-y-auto">
-            {suggestions2.map((item, idx) => (
-              <SuggestionItem
-                key={idx}
-                item={item}
-                onClick={() => handleSuggestionClick2(item)}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
+      {renderInput(1, "Enter first celebrity name...")}
+      {renderInput(2, "Enter second celebrity name...")}
       <button
         type="submit"
         disabled={!canSubmit}

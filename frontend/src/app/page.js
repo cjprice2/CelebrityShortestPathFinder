@@ -85,7 +85,7 @@ export default function HomePage() {
             </div>
             <div className="flex items-start gap-1">
               <span className="text-blue-400 font-semibold min-w-[12px]">2.</span>
-              <span>Click the search button to find suggestions</span>
+              <span>Click the search button or press Enter to find suggestions</span>
             </div>
             <div className="flex items-start gap-1">
               <span className="text-blue-400 font-semibold min-w-[12px]">3.</span>
