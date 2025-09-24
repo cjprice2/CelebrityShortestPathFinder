@@ -1,22 +1,4 @@
 services:
-  postgres:
-    image: postgres:15
-    container_name: celebrity_postgres
-    command: ["postgres", "-c", "max_wal_size=4GB"]
-    environment:
-      POSTGRES_DB: celebrity_graph
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      timeout: 20s
-      retries: 10
-
   backend:
     build: 
       context: ./backend
@@ -27,13 +9,10 @@ services:
       - JAVA_OPTS=-Xmx2g -Xms512m
       - TMDB_API_KEY=${TMDB_API_KEY}
       - SPRING_PROFILES_ACTIVE=database
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/celebrity_graph
-      - DB_USERNAME=postgres
-      - DB_PASSWORD=password
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
       - GRAPH_RESOURCE_DIR=/app/src/main/resources
-    depends_on:
-      postgres:
-        condition: service_healthy
     restart: unless-stopped
 
   frontend:
@@ -47,6 +26,3 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
-
-volumes:
-  postgres_data:

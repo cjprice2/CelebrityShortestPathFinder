@@ -3,6 +3,7 @@ package com.example.service;
 import com.example.repository.CelebrityRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.io.*;
@@ -21,6 +22,7 @@ public class DataLoadingService {
     @Autowired
     private JdbcTemplate jdbcTemplate;
     
+    @Transactional(readOnly = true)
     public void loadDataFromFilesIfNeeded() {
         if (Boolean.parseBoolean(System.getenv().getOrDefault("SKIP_DATA_LOADING", "false"))) {
             System.out.println("Data loading skipped via SKIP_DATA_LOADING=true");
@@ -70,6 +72,7 @@ public class DataLoadingService {
         }
     }
 
+    @Transactional
     public void loadDataFromCSV() {
         String resourceDir = System.getenv().getOrDefault("GRAPH_RESOURCE_DIR", "/home/colin/projects/CelebrityShortestPathFinder/backend/src/main/resources");
         String castFile = Paths.get(resourceDir, "cast.csv.gz").toString();
@@ -77,16 +80,34 @@ public class DataLoadingService {
         System.out.println("📂 Loading data from: " + castFile);
         // Ensure schema/indexes needed for ON CONFLICT are present to avoid SQL grammar errors
         try {
+            // Enable pg_trgm extension for trigram searches
+            jdbcTemplate.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm");
+            
+            // Celebrity-Title relationship indexes
             jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_celebrity_titles_pair ON celebrity_titles(celebrity_id, title_id)");
-            // Speed up neighbor lookups and joins during BFS
             jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_celebrity_titles_celebrity_id ON celebrity_titles(celebrity_id)");
             jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_celebrity_titles_title_id ON celebrity_titles(title_id)");
-            // Faster text search for name contains and id prefix
-            jdbcTemplate.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm");
-            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_celebrities_name_trgm ON celebrities USING gin (name gin_trgm_ops)");
+            
+            // Optimized celebrity search indexes for fast prefix and kNN searches
+            // 1. Pattern index for prefix searches (LIKE 'term%') - fastest for prefix matching
+            jdbcTemplate.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_celebrities_name_lower_pattern ON celebrities USING btree (lower(name) text_pattern_ops)");
+            
+            // 2. GiST trigram index for kNN similarity searches (ORDER BY distance)
+            jdbcTemplate.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_celebrities_name_lower_gist_trgm ON celebrities USING gist (lower(name) gist_trgm_ops)");
+            
+            // 3. GIN trigram index for general trigram searches (fallback)
+            jdbcTemplate.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_celebrities_name_lower_trgm ON celebrities USING gin (lower(name) gin_trgm_ops)");
+            
+            // 4. ID search index (for exact ID lookups)
             jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_celebrities_id_trgm ON celebrities USING gin (id gin_trgm_ops)");
-            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_celebrities_name_lower ON celebrities ((lower(name)))");
-        } catch (Exception ignored) {}
+            
+            // Update table statistics for optimal query planning
+            jdbcTemplate.execute("ANALYZE celebrities");
+            
+            System.out.println("✅ Database indexes created successfully for optimized search performance");
+        } catch (Exception e) {
+            System.err.println("⚠️ Warning: Some indexes may not have been created: " + e.getMessage());
+        }
         
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(new GZIPInputStream(Files.newInputStream(Paths.get(castFile))), StandardCharsets.UTF_8), 16 * 1024)) {

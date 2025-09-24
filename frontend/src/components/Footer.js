@@ -16,8 +16,16 @@ export default function Footer() {
           
           {/* Required Disclaimer */}
           <p className="text-xs text-gray-500 text-center">
-            This application uses TMDB and the TMDB API for celebrity images but is not endorsed, 
-            certified, or otherwise approved by TMDB. Celebrity dataset was filtered and cleaned from{" "}
+            This application uses {""}
+            <a
+              href="https://www.themoviedb.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 underline"
+            >
+              TMDB
+            </a>{" "}
+            and the TMDB API for celebrity images but is not endorsed, certified, or otherwise approved by TMDB. Celebrity dataset was filtered and cleaned from{" "}
             <a 
               href="https://developer.imdb.com/non-commercial-datasets/" 
               target="_blank" 
@@ -31,7 +39,25 @@ export default function Footer() {
           
           {/* App Info */}
           <div className="text-xs text-gray-600 pt-1 text-center">
-            <p>Celebrity Shortest Path Finder - Find connections between celebrities through shared titles. Inspired by{" "}
+            <p>Celebrity Shortest Path Finder - Made by{" "}
+              <a 
+                href="https://cjprice2.github.io" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300 underline"
+              >
+                Colin Price
+              </a>{" "}
+              -{" "}
+              <a 
+                href="https://github.com/cjprice2/CelebrityShortestPathFinder" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300 underline"
+              >
+                Github
+              </a>
+              . Inspired by{" "}
               <a 
                 href="https://en.wikipedia.org/wiki/Six_Degrees_of_Kevin_Bacon" 
                 target="_blank" 

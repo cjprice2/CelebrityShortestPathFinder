@@ -35,10 +35,13 @@ A modern web application that finds the shortest path between two celebrities th
 - `GET /api/shortest-path?id1=nmXXXXXXX&id2=nmXXXXXXX&max=5` – path results
 - Health/utility: `GET /api/health`, `GET /api/graph-status`
 
-## Example (user flow)
+## How to Use
 
-- Type to search, pick suggestions → inputs show green borders with checkmarks
-- Click “Find Shortest Path” when both are selected → results render with IMDb links
+1. **Type celebrity name** in either search box
+2. **Click search button** (🔍) to find suggestions with photos
+3. **Select a celebrity** from the dropdown → green checkmark appears
+4. **Repeat for second celebrity**
+5. **Click "Find Shortest Path"** when both are selected → results appear
 
 ## Tech Stack
 

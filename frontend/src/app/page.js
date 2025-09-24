@@ -81,19 +81,19 @@ export default function HomePage() {
           <div className="text-gray-300 text-xs space-y-0.5 flex flex-col items-center">
             <div className="flex items-start gap-1">
               <span className="text-blue-400 font-semibold min-w-[12px]">1.</span>
-              <span>Click each box and start typing a celebrity&apos;s name</span>
+              <span>Type a celebrity&apos;s name in a search box</span>
             </div>
             <div className="flex items-start gap-1">
               <span className="text-blue-400 font-semibold min-w-[12px]">2.</span>
-              <span>Pick the correct match from the suggestions</span>
+              <span>Click the search button to find suggestions</span>
             </div>
             <div className="flex items-start gap-1">
               <span className="text-blue-400 font-semibold min-w-[12px]">3.</span>
-              <span>When both have a checkmark, press Find Shortest Path</span>
+              <span>Select a celebrity from the dropdown, green checkmark appears</span>
             </div>
             <div className="flex items-start gap-1">
               <span className="text-blue-400 font-semibold min-w-[12px]">4.</span>
-              <span>Tap names or titles to open their IMDb pages</span>
+              <span>Repeat for second celebrity, then click Find Shortest Path</span>
             </div>
           </div>
         </div>

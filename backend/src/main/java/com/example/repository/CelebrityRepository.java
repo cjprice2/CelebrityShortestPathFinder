@@ -3,6 +3,8 @@ package com.example.repository;
 import com.example.entity.Celebrity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -27,7 +29,16 @@ public interface CelebrityRepository extends JpaRepository<Celebrity, String> {
     // Additional bounded variant for better matching resolution
     List<Celebrity> findTop50ByNameContainingIgnoreCase(String name);
 
-    // Prefix search (index-friendly). MySQL syntax with case-insensitive collation
-    @Query(value = "SELECT * FROM celebrities WHERE name LIKE :pattern ORDER BY name LIMIT 10", nativeQuery = true)
-    List<Celebrity> searchByNamePrefix(@Param("pattern") String pattern);
+    // Prefix search (index-friendly) using lower(name) LIKE 'term%' sorted alphabetically
+    Page<Celebrity> findByNameStartingWithIgnoreCaseOrderByNameAsc(String prefix, Pageable pageable);
+
+    // Trigram kNN fallback: use % (similar) and <-> (distance) on lower(name)
+    @Query(value = """
+      SELECT id, name
+      FROM celebrities
+      WHERE lower(name) % lower(:term)
+      ORDER BY lower(name) <-> lower(:term)
+      LIMIT :limit
+      """, nativeQuery = true)
+    List<Object[]> searchByTrgmKnn(@Param("term") String term, @Param("limit") int limit);
 }

@@ -6,7 +6,6 @@ import com.example.repository.CelebrityTitleRepository;
 import com.example.repository.TitleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.util.concurrent.TimeUnit;
@@ -344,7 +343,6 @@ public class DatabaseGraphService {
     }
     
     
-    @Transactional(readOnly = true)
     public List<Celebrity> searchCelebrities(String query) {
         // Check cache first
         String cacheKey = query.toLowerCase().trim();
@@ -353,20 +351,30 @@ public class DatabaseGraphService {
             return cached;
         }
         
-        // Prefer prefix search for speed, fall back to contains
-        List<Celebrity> byName = celebrityRepository.searchByNamePrefix(query + "%");
-        if (!byName.isEmpty()) {
-            searchCache.put(cacheKey, byName);
-            return byName;
+        // 1) Prefer prefix search heavily (LIKE 'term%')
+        var page = org.springframework.data.domain.PageRequest.of(0, 10);
+        List<Celebrity> collected = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+
+        // a) Full term prefix (sorted alphabetically)
+        List<Celebrity> byFullPrefix = celebrityRepository.findByNameStartingWithIgnoreCaseOrderByNameAsc(query, page).getContent();
+        for (Celebrity c : byFullPrefix) if (seen.add(c.getId())) collected.add(c);
+        if (collected.size() >= 10) { searchCache.put(cacheKey, collected); return collected; }
+
+        // b) Token prefixes (try each token, longest first)
+        String[] tokens = query.trim().split("\\s+");
+        java.util.Arrays.sort(tokens, (a, b) -> Integer.compare(b.length(), a.length()));
+        for (String t : tokens) {
+            if (t.length() < 2) continue;
+            List<Celebrity> pageRes = celebrityRepository.findByNameStartingWithIgnoreCaseOrderByNameAsc(t, page).getContent();
+            for (Celebrity c : pageRes) {
+                if (seen.add(c.getId())) collected.add(c);
+                if (collected.size() >= 10) { searchCache.put(cacheKey, collected); return collected; }
+            }
         }
-        byName = celebrityRepository.findTop10ByNameContainingIgnoreCase(query);
-        if (!byName.isEmpty()) {
-            searchCache.put(cacheKey, byName);
-            return byName;
-        }
-        // If no name matches, try ID contains (supports 'nm' prefix searches)
-        List<Celebrity> result = celebrityRepository.findTop10ByIdContainingIgnoreCase(query);
-        searchCache.put(cacheKey, result);
-        return result;
+
+        // Only prefix-based results are returned
+        searchCache.put(cacheKey, collected);
+        return collected;
     }
 }

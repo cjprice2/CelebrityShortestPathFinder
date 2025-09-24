@@ -67,7 +67,9 @@ public class CelebrityController {
     public ResponseEntity<List<Map<String, Object>>> searchCelebritiesGraph(@RequestParam String q) {
         String trimmed = q == null ? "" : q.trim();
         if (trimmed.length() < 2) {
-            return ResponseEntity.ok(java.util.Collections.emptyList());
+            return ResponseEntity.ok()
+                    .header("Cache-Control", "public, max-age=60")
+                    .body(java.util.Collections.emptyList());
         }
         List<Map<String, Object>> results = new ArrayList<>();
         
@@ -76,8 +78,10 @@ public class CelebrityController {
         for (Celebrity celebrity : celebrities) {
             results.add(Map.of("nconst", celebrity.getId(), "name", celebrity.getName()));
         }
-        
-        return ResponseEntity.ok(results);
+
+        return ResponseEntity.ok()
+                .header("Cache-Control", "public, max-age=60")
+                .body(results);
     }
 
     @GetMapping("/celebrity-photo")
