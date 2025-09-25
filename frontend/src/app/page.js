@@ -79,19 +79,19 @@ export default function HomePage() {
         <div className="w-full max-w-lg mt-1 mb-3 bg-gray-800 px-3 rounded border border-gray-700">
           <h2 className="text-white font-bold text-sm mb-1 text-center">How to use:</h2>
           <div className="text-gray-300 text-xs space-y-0.5 flex flex-col items-start">
-            <div className="flex items-start gap-1">
+            <div className="flex items-start gap-1 text-left">
               <span className="text-blue-400 font-semibold min-w-[12px]">1.</span>
               <span>Type a celebrity&apos;s name in a search box</span>
             </div>
-            <div className="flex items-start gap-1">
+            <div className="flex items-start gap-1 text-left">
               <span className="text-blue-400 font-semibold min-w-[12px]">2.</span>
               <span>Click the search button or press Enter to find suggestions</span>
             </div>
-            <div className="flex items-start gap-1">
+            <div className="flex items-start gap-1 text-left">
               <span className="text-blue-400 font-semibold min-w-[12px]">3.</span>
               <span>Select a celebrity from the dropdown, green checkmark appears</span>
             </div>
-            <div className="flex items-start gap-1">
+            <div className="flex items-start gap-1 text-left">
               <span className="text-blue-400 font-semibold min-w-[12px]">4.</span>
               <span>Repeat for second celebrity, then click Find Shortest Path</span>
             </div>
