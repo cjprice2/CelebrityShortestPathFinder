@@ -78,7 +78,7 @@ export default function HomePage() {
       <main className="flex flex-col items-center justify-start pt-2 pb-8 px-2 sm:pt-2 sm:px-8 flex-grow">        {/* How to use instructions */}
         <div className="w-full max-w-lg mt-1 mb-3 bg-gray-800 px-3 rounded border border-gray-700">
           <h2 className="text-white font-bold text-sm mb-1 text-center">How to use:</h2>
-          <div className="text-gray-300 text-xs space-y-0.5 flex flex-col items-center">
+          <div className="text-gray-300 text-xs space-y-0.5 flex flex-col items-start">
             <div className="flex items-start gap-1">
               <span className="text-blue-400 font-semibold min-w-[12px]">1.</span>
               <span>Type a celebrity&apos;s name in a search box</span>
