@@ -22,11 +22,7 @@ public interface CelebrityRepository extends JpaRepository<Celebrity, String> {
     // Fallback: allow searching by ID substring (e.g., nm123)
     List<Celebrity> findByIdContainingIgnoreCase(String id);
 
-    // Bounded variants to avoid OOMs on wide queries (10 to match UI suggestions)
-    List<Celebrity> findTop10ByNameContainingIgnoreCase(String name);
-    List<Celebrity> findTop10ByIdContainingIgnoreCase(String id);
-
-    // Additional bounded variant for better matching resolution
+    // Bounded variant for better matching resolution (used in resolveCelebrityId)
     List<Celebrity> findTop50ByNameContainingIgnoreCase(String name);
 
     // Prefix search (index-friendly) using lower(name) LIKE 'term%' sorted alphabetically
@@ -41,4 +37,5 @@ public interface CelebrityRepository extends JpaRepository<Celebrity, String> {
       LIMIT :limit
       """, nativeQuery = true)
     List<Object[]> searchByTrgmKnn(@Param("term") String term, @Param("limit") int limit);
+
 }

@@ -101,8 +101,20 @@ public class DataLoadingService {
             // 4. ID search index (for exact ID lookups)
             jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_celebrities_id_trgm ON celebrities USING gin (id gin_trgm_ops)");
             
+            // 5. Word-based search index for splitting names by spaces
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_celebrities_name_words ON celebrities USING gin (string_to_array(lower(name), ' '))");
+            
+            // 6. Composite index for efficient id+name lookups
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_celebrities_id_name ON celebrities (id, name)");
+            
+            // 7. Title search indexes for consistency
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_titles_name_lower ON titles (lower(name))");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_titles_name_lower_pattern ON titles (lower(name) text_pattern_ops)");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_titles_id_name ON titles (id, name)");
+            
             // Update table statistics for optimal query planning
             jdbcTemplate.execute("ANALYZE celebrities");
+            jdbcTemplate.execute("ANALYZE titles");
             
             System.out.println("✅ Database indexes created successfully for optimized search performance");
         } catch (Exception e) {

@@ -25,10 +25,10 @@ public class DatabaseGraphService {
     @Autowired
     private CelebrityTitleRepository celebrityTitleRepository;
     
-    // Small cache for search results (60s TTL, max 1000 entries)
+    // Optimized cache for search results (5min TTL, max 5000 entries)
     private final Cache<String, List<Celebrity>> searchCache = Caffeine.newBuilder()
-            .maximumSize(1000)
-            .expireAfterWrite(60, TimeUnit.SECONDS)
+            .maximumSize(5000)
+            .expireAfterWrite(300, TimeUnit.SECONDS)
             .build();
     
     @Autowired
@@ -164,11 +164,19 @@ public class DatabaseGraphService {
                 break;
             }
             
-            // Expand forward search
-            String meetingFromForward = expandSearch(forwardQueue, forwardVisited, forwardParent, backwardVisited, true);
-            if (meetingFromForward != null && !foundMeetingPoints.contains(meetingFromForward)) {
-                foundMeetingPoints.add(meetingFromForward);
-                int pathLength = calculatePathLength(forwardParent, backwardParent, startId, endId, meetingFromForward);
+            // Always expand the smaller queue first to maintain symmetry
+            // This ensures the same search pattern regardless of start/end order
+            String meetingPoint = null;
+            if (forwardQueue.size() <= backwardQueue.size()) {
+                meetingPoint = expandSearch(forwardQueue, forwardVisited, forwardParent, backwardVisited, true);
+            } else {
+                meetingPoint = expandSearch(backwardQueue, backwardVisited, backwardParent, forwardVisited, false);
+            }
+            
+            // Process meeting point if found
+            if (meetingPoint != null && !foundMeetingPoints.contains(meetingPoint)) {
+                foundMeetingPoints.add(meetingPoint);
+                int pathLength = calculatePathLength(forwardParent, backwardParent, startId, endId, meetingPoint);
                 
                 // If this is the first path found, set the shortest length
                 if (shortestPathLength == -1) {
@@ -177,32 +185,10 @@ public class DatabaseGraphService {
                 
                 // Only add paths of the shortest length
                 if (pathLength == shortestPathLength) {
-                    List<String> path = reconstructBidirectionalPath(forwardParent, backwardParent, startId, endId, meetingFromForward);
+                    List<String> path = reconstructBidirectionalPath(forwardParent, backwardParent, startId, endId, meetingPoint);
                     allPaths.addAll(path);
                 }
                 // If we found a longer path, we're done (BFS guarantees we won't find shorter ones)
-                else if (pathLength > shortestPathLength) {
-                    break;
-                }
-            }
-            
-            // Expand backward search
-            String meetingFromBackward = expandSearch(backwardQueue, backwardVisited, backwardParent, forwardVisited, false);
-            if (meetingFromBackward != null && !foundMeetingPoints.contains(meetingFromBackward)) {
-                foundMeetingPoints.add(meetingFromBackward);
-                int pathLength = calculatePathLength(forwardParent, backwardParent, startId, endId, meetingFromBackward);
-                
-                // If this is the first path found, set the shortest length
-                if (shortestPathLength == -1) {
-                    shortestPathLength = pathLength;
-                }
-                
-                // Only add paths of the shortest length
-                if (pathLength == shortestPathLength) {
-                    List<String> path = reconstructBidirectionalPath(forwardParent, backwardParent, startId, endId, meetingFromBackward);
-                    allPaths.addAll(path);
-                }
-                // If we found a longer path, we're done
                 else if (pathLength > shortestPathLength) {
                     break;
                 }
@@ -351,30 +337,12 @@ public class DatabaseGraphService {
             return cached;
         }
         
-        // 1) Prefer prefix search heavily (LIKE 'term%')
+        // Use reliable Spring Data method (no connection leaks)
         var page = org.springframework.data.domain.PageRequest.of(0, 10);
-        List<Celebrity> collected = new ArrayList<>();
-        java.util.Set<String> seen = new java.util.HashSet<>();
-
-        // a) Full term prefix (sorted alphabetically)
-        List<Celebrity> byFullPrefix = celebrityRepository.findByNameStartingWithIgnoreCaseOrderByNameAsc(query, page).getContent();
-        for (Celebrity c : byFullPrefix) if (seen.add(c.getId())) collected.add(c);
-        if (collected.size() >= 10) { searchCache.put(cacheKey, collected); return collected; }
-
-        // b) Token prefixes (try each token, longest first)
-        String[] tokens = query.trim().split("\\s+");
-        java.util.Arrays.sort(tokens, (a, b) -> Integer.compare(b.length(), a.length()));
-        for (String t : tokens) {
-            if (t.length() < 2) continue;
-            List<Celebrity> pageRes = celebrityRepository.findByNameStartingWithIgnoreCaseOrderByNameAsc(t, page).getContent();
-            for (Celebrity c : pageRes) {
-                if (seen.add(c.getId())) collected.add(c);
-                if (collected.size() >= 10) { searchCache.put(cacheKey, collected); return collected; }
-            }
-        }
-
-        // Only prefix-based results are returned
-        searchCache.put(cacheKey, collected);
-        return collected;
+        List<Celebrity> results = celebrityRepository.findByNameStartingWithIgnoreCaseOrderByNameAsc(query, page).getContent();
+        
+        // Cache and return results
+        searchCache.put(cacheKey, results);
+        return results;
     }
 }
